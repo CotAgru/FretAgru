@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback, useRef } from 'react'
-import { Plus, Pencil, Trash2, X, Search, Loader2, MapPin, CarFront } from 'lucide-react'
+import { Plus, Pencil, Trash2, X, Search, Loader2, MapPin, CarFront, Filter, XCircle } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { getCadastros, createCadastro, updateCadastro, deleteCadastro, createVeiculo, getVeiculos } from '../services/api'
 import { APIProvider, Map, AdvancedMarker, useMap } from '@vis.gl/react-google-maps'
@@ -118,6 +118,8 @@ export default function Cadastros() {
   const [allVeiculos, setAllVeiculos] = useState<any[]>([])
   const [filtroUf, setFiltroUf] = useState('')
   const [filtroCidade, setFiltroCidade] = useState('')
+  const [filtroAtivo, setFiltroAtivo] = useState<string>('')
+  const [showFilters, setShowFilters] = useState(false)
 
   const load = () => {
     setLoading(true)
@@ -306,6 +308,8 @@ export default function Cadastros() {
     if (filtroTipo && !(i.tipos || []).includes(filtroTipo)) return false
     if (filtroUf && i.uf !== filtroUf) return false
     if (filtroCidade && i.cidade !== filtroCidade) return false
+    if (filtroAtivo === 'ativo' && !i.ativo) return false
+    if (filtroAtivo === 'inativo' && i.ativo) return false
     if (!busca) return true
     const term = busca.toLowerCase()
     return i.nome?.toLowerCase().includes(term) || i.nome_fantasia?.toLowerCase().includes(term) ||
@@ -313,9 +317,10 @@ export default function Cadastros() {
       placasPorCadastro(i.id).some(p => p.toLowerCase().includes(term))
   })
 
-  // UFs e cidades disponíveis nos dados para filtro
   const ufsDisponiveis = [...new Set(items.map(i => i.uf))].sort()
   const cidadesDisponiveis = filtroUf ? [...new Set(items.filter(i => i.uf === filtroUf).map(i => i.cidade))].sort() : []
+  const hasActiveFilters = filtroTipo || filtroUf || filtroCidade || filtroAtivo || busca
+  const clearAllFilters = () => { setFiltroTipo(''); setFiltroUf(''); setFiltroCidade(''); setFiltroAtivo(''); setBusca('') }
 
   const tipoColors: Record<string, string> = {
     Fazenda: 'bg-green-100 text-green-700', Armazem: 'bg-blue-100 text-blue-700',
@@ -333,30 +338,90 @@ export default function Cadastros() {
         </button>
       </div>
 
-      {/* Filtros */}
-      <div className="mb-4 flex gap-2 sm:gap-3 flex-wrap">
-        <div className="relative flex-1 min-w-0 sm:min-w-[200px]">
+      {/* Barra de busca + botao filtros */}
+      <div className="mb-3 flex gap-2 items-center">
+        <div className="relative flex-1 min-w-0">
           <Search className="w-4 h-4 absolute left-3 top-3 text-gray-400" />
           <input type="text" placeholder="Buscar nome, CNPJ, cidade, placa..." value={busca} onChange={e => setBusca(e.target.value)}
-            className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent" />
+            className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent text-sm" />
         </div>
-        <select value={filtroTipo} onChange={e => setFiltroTipo(e.target.value)}
-          className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent text-sm">
-          <option value="">Todos os tipos</option>
-          {TODOS_TIPOS.map(t => <option key={t} value={t}>{t}</option>)}
-        </select>
-        <select value={filtroUf} onChange={e => { setFiltroUf(e.target.value); setFiltroCidade('') }}
-          className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent text-sm">
-          <option value="">Todas UFs</option>
-          {ufsDisponiveis.map(u => <option key={u} value={u}>{u}</option>)}
-        </select>
-        {filtroUf && cidadesDisponiveis.length > 0 && (
-          <select value={filtroCidade} onChange={e => setFiltroCidade(e.target.value)}
-            className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent text-sm">
-            <option value="">Todas cidades</option>
-            {cidadesDisponiveis.map(c => <option key={c} value={c}>{c}</option>)}
-          </select>
-        )}
+        <button onClick={() => setShowFilters(!showFilters)}
+          className={`flex items-center gap-1.5 px-3 py-2 border rounded-lg text-sm font-medium transition-colors ${
+            showFilters || hasActiveFilters ? 'bg-green-50 border-green-400 text-green-700' : 'border-gray-300 text-gray-600 hover:bg-gray-50'
+          }`}>
+          <Filter className="w-4 h-4" /> Filtros
+          {hasActiveFilters && <span className="bg-green-600 text-white text-[10px] rounded-full w-4 h-4 flex items-center justify-center">
+            {[filtroTipo, filtroUf, filtroCidade, filtroAtivo].filter(Boolean).length}
+          </span>}
+        </button>
+      </div>
+
+      {/* Painel de filtros expansivel */}
+      {showFilters && (
+        <div className="mb-4 p-3 bg-gray-50 border border-gray-200 rounded-lg space-y-3">
+          {/* Tipos como chips */}
+          <div>
+            <label className="block text-xs font-medium text-gray-500 mb-1.5">Tipo</label>
+            <div className="flex flex-wrap gap-1.5">
+              <button onClick={() => setFiltroTipo('')}
+                className={`px-2.5 py-1 rounded-full text-xs font-medium transition-colors ${
+                  !filtroTipo ? 'bg-green-600 text-white' : 'bg-white border border-gray-300 text-gray-600 hover:border-green-400'
+                }`}>Todos</button>
+              {TODOS_TIPOS.map(t => (
+                <button key={t} onClick={() => setFiltroTipo(filtroTipo === t ? '' : t)}
+                  className={`px-2.5 py-1 rounded-full text-xs font-medium transition-colors ${
+                    filtroTipo === t
+                      ? `${tipoColors[t] || 'bg-gray-600 text-white'} ring-1 ring-offset-1 ring-green-500`
+                      : 'bg-white border border-gray-300 text-gray-600 hover:border-green-400'
+                  }`}>{t}</button>
+              ))}
+            </div>
+          </div>
+
+          {/* UF + Cidade + Status */}
+          <div className="flex gap-2 flex-wrap">
+            <div className="min-w-[100px]">
+              <label className="block text-xs font-medium text-gray-500 mb-1">UF</label>
+              <select value={filtroUf} onChange={e => { setFiltroUf(e.target.value); setFiltroCidade('') }}
+                className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm">
+                <option value="">Todas</option>
+                {ufsDisponiveis.map(u => <option key={u} value={u}>{u}</option>)}
+              </select>
+            </div>
+            {filtroUf && cidadesDisponiveis.length > 0 && (
+              <div className="min-w-[140px] flex-1">
+                <label className="block text-xs font-medium text-gray-500 mb-1">Cidade</label>
+                <select value={filtroCidade} onChange={e => setFiltroCidade(e.target.value)}
+                  className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm">
+                  <option value="">Todas</option>
+                  {cidadesDisponiveis.map(c => <option key={c} value={c}>{c}</option>)}
+                </select>
+              </div>
+            )}
+            <div className="min-w-[100px]">
+              <label className="block text-xs font-medium text-gray-500 mb-1">Status</label>
+              <select value={filtroAtivo} onChange={e => setFiltroAtivo(e.target.value)}
+                className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm">
+                <option value="">Todos</option>
+                <option value="ativo">Ativos</option>
+                <option value="inativo">Inativos</option>
+              </select>
+            </div>
+          </div>
+
+          {/* Limpar filtros */}
+          {hasActiveFilters && (
+            <button onClick={clearAllFilters} className="flex items-center gap-1 text-xs text-red-600 hover:text-red-700">
+              <XCircle className="w-3.5 h-3.5" /> Limpar todos os filtros
+            </button>
+          )}
+        </div>
+      )}
+
+      {/* Contador de resultados */}
+      <div className="mb-2 text-xs text-gray-400 flex items-center gap-2">
+        <span>{filtered.length} de {items.length} cadastros</span>
+        {hasActiveFilters && <span className="text-green-600 font-medium">(filtrado)</span>}
       </div>
 
       {/* Tabela */}

@@ -94,6 +94,19 @@ export const updatePreco = async (id: string, data: any) =>
 export const deletePreco = async (id: string) =>
   throwIfError(await supabase.from('precos_contratados').delete().eq('id', id))
 
+// === OPERACOES ===
+export const getOperacoes = async () =>
+  throwIfError(await supabase.from('operacoes').select('*').order('created_at', { ascending: false }))
+
+export const createOperacao = async (data: any) =>
+  throwIfError(await supabase.from('operacoes').insert(data).select().single())
+
+export const updateOperacao = async (id: string, data: any) =>
+  throwIfError(await supabase.from('operacoes').update(data).eq('id', id).select().single())
+
+export const deleteOperacao = async (id: string) =>
+  throwIfError(await supabase.from('operacoes').delete().eq('id', id))
+
 // === ORDENS DE CARREGAMENTO ===
 export const getOrdens = async () => {
   const { data, error } = await supabase
@@ -102,7 +115,8 @@ export const getOrdens = async () => {
       *,
       origem:cadastros!ordens_carregamento_origem_id_fkey(nome, nome_fantasia),
       destino:cadastros!ordens_carregamento_destino_id_fkey(nome, nome_fantasia),
-      produtos(nome, tipo)
+      produtos(nome, tipo),
+      operacoes(id, nome)
     `)
     .order('created_at', { ascending: false })
   if (error) throw error
@@ -111,6 +125,7 @@ export const getOrdens = async () => {
     origem_nome: o.origem?.nome_fantasia || o.origem?.nome,
     destino_nome: o.destino?.nome_fantasia || o.destino?.nome,
     produto_nome: o.produtos?.nome,
+    operacao_nome: o.operacoes?.nome || null,
   }))
 }
 

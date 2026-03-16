@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
-import { Plus, Pencil, Trash2, X, Truck, User, Minus } from 'lucide-react'
+import { Plus, Pencil, Trash2, X, Truck, User, Minus, Check, CarFront } from 'lucide-react'
 import toast from 'react-hot-toast'
-import { getOrdens, createOrdem, updateOrdem, deleteOrdem, getCadastros, getProdutos, getVeiculos, getPrecos, getOrdemTransportadores, addOrdemTransportador, removeOrdemTransportador, createCadastro, createProduto } from '../services/api'
+import { getOrdens, createOrdem, updateOrdem, deleteOrdem, getCadastros, getProdutos, getVeiculos, getPrecos, getOrdemTransportadores, addOrdemTransportador, removeOrdemTransportador, getOperacoes } from '../services/api'
 
 const STATUS_OPTIONS = [
   { value: 'pendente', label: 'Pendente', color: 'bg-yellow-100 text-yellow-700' },
@@ -12,9 +12,16 @@ const STATUS_OPTIONS = [
 const TIPOS_ORIGEM = ['Fazenda', 'Armazem', 'Industria', 'Porto', 'Fornecedor']
 
 const emptyForm = {
-  nome_ordem: '', status: 'pendente', origem_id: '', destino_id: '', produto_id: '',
+  nome_ordem: '', status: 'pendente', operacao_id: '', origem_id: '', destino_id: '', produto_id: '',
   preco_id: '', quantidade_prevista: '', unidade: 'ton', observacoes: '', ativo: true,
 }
+
+// Estilo da opcao "+ Novo" nos selects (CSS inline pois <option> tem limitacoes)
+const NOVO_LABEL = '\u2795 Novo cadastro...'
+const NOVO_PROD_LABEL = '\u2795 Novo produto...'
+const NOVO_PRECO_LABEL = '\u2795 Novo preco...'
+const NOVO_TRANSP_LABEL = '\u2795 Nova transportadora...'
+const NOVO_MOT_LABEL = '\u2795 Novo motorista...'
 
 export default function Ordens() {
   const [items, setItems] = useState<any[]>([])
@@ -25,6 +32,7 @@ export default function Ordens() {
   const [produtos, setProdutos] = useState<any[]>([])
   const [veiculos, setVeiculos] = useState<any[]>([])
   const [precos, setPrecos] = useState<any[]>([])
+  const [operacoes, setOperacoes] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [showForm, setShowForm] = useState(false)
   const [editing, setEditing] = useState<any>(null)
@@ -32,24 +40,16 @@ export default function Ordens() {
 
   // Transportadores vinculados a ordem (junction table)
   const [ordemTransps, setOrdemTransps] = useState<any[]>([])
-  const [addTranspId, setAddTranspId] = useState('')
-  const [addMotoristaId, setAddMotoristaId] = useState('')
+  // Transportadora selecionada e motoristas com checkboxes
+  const [selectedTranspId, setSelectedTranspId] = useState('')
 
-  // Mini-forms inline para "+ Novo"
-  const [showNewOrigem, setShowNewOrigem] = useState(false)
-  const [showNewDestino, setShowNewDestino] = useState(false)
-  const [showNewProduto, setShowNewProduto] = useState(false)
-  const [newCadNome, setNewCadNome] = useState('')
-  const [newCadUf, setNewCadUf] = useState('GO')
-  const [newCadCidade, setNewCadCidade] = useState('')
-  const [newCadTipo, setNewCadTipo] = useState('Fazenda')
-  const [newProdNome, setNewProdNome] = useState('')
-  const [newProdTipo, setNewProdTipo] = useState('Grao')
+  // Modal overlay: qual tela abrir (cadastro, produto, preco)
+  const [overlayTarget, setOverlayTarget] = useState<string | null>(null)
 
   const load = () => {
     setLoading(true)
-    Promise.all([getOrdens(), getCadastros(), getProdutos(), getVeiculos(), getPrecos()])
-      .then(([o, c, p, v, pr]) => {
+    Promise.all([getOrdens(), getCadastros(), getProdutos(), getVeiculos(), getPrecos(), getOperacoes()])
+      .then(([o, c, p, v, pr, ops]) => {
         setItems(o)
         setAllCadastros(c)
         setOrigens(c.filter((x: any) => (x.tipos || []).some((t: string) => TIPOS_ORIGEM.includes(t))))
@@ -58,10 +58,26 @@ export default function Ordens() {
         setProdutos(p)
         setVeiculos(v)
         setPrecos(pr)
+        setOperacoes(ops)
       })
       .catch(() => toast.error('Erro ao carregar'))
       .finally(() => setLoading(false))
   }
+
+  const reloadData = async () => {
+    try {
+      const [c, p, v, pr, ops] = await Promise.all([getCadastros(), getProdutos(), getVeiculos(), getPrecos(), getOperacoes()])
+      setAllCadastros(c)
+      setOrigens(c.filter((x: any) => (x.tipos || []).some((t: string) => TIPOS_ORIGEM.includes(t))))
+      setTransportadoras(c.filter((x: any) => (x.tipos || []).includes('Transportadora')))
+      setAllMotoristas(c.filter((x: any) => (x.tipos || []).includes('Motorista')))
+      setProdutos(p)
+      setVeiculos(v)
+      setPrecos(pr)
+      setOperacoes(ops)
+    } catch {}
+  }
+
   useEffect(() => { load() }, [])
 
   // Precos filtrados por origem×destino
@@ -69,35 +85,13 @@ export default function Ordens() {
     ? precos.filter((p: any) => p.origem_id === form.origem_id && p.destino_id === form.destino_id)
     : precos
 
-  // Criar novo cadastro inline
-  const criarCadastroInline = async (target: 'origem' | 'destino') => {
-    if (!newCadNome.trim() || !newCadCidade.trim()) { toast.error('Nome e cidade sao obrigatorios'); return }
-    try {
-      const result = await createCadastro({ nome: newCadNome, uf: newCadUf, cidade: newCadCidade, tipos: [newCadTipo], ativo: true })
-      toast.success('Cadastro criado!')
-      // Recarregar dados
-      const c = await getCadastros()
-      setAllCadastros(c)
-      setOrigens(c.filter((x: any) => (x.tipos || []).some((t: string) => TIPOS_ORIGEM.includes(t))))
-      setTransportadoras(c.filter((x: any) => (x.tipos || []).includes('Transportadora')))
-      setAllMotoristas(c.filter((x: any) => (x.tipos || []).includes('Motorista')))
-      setForm(prev => ({ ...prev, [target === 'origem' ? 'origem_id' : 'destino_id']: result.id }))
-      setShowNewOrigem(false); setShowNewDestino(false)
-      setNewCadNome(''); setNewCadCidade('')
-    } catch { toast.error('Erro ao criar cadastro') }
-  }
+  // Motoristas filtrados pela transportadora selecionada
+  const motoristasDaTransp = selectedTranspId
+    ? allMotoristas.filter(m => m.transportador_id === selectedTranspId)
+    : []
 
-  const criarProdutoInline = async () => {
-    if (!newProdNome.trim()) { toast.error('Nome do produto e obrigatorio'); return }
-    try {
-      const result = await createProduto({ nome: newProdNome, tipo: newProdTipo, unidade_medida: 'ton', ativo: true })
-      toast.success('Produto criado!')
-      const p = await getProdutos()
-      setProdutos(p)
-      setForm(prev => ({ ...prev, produto_id: result.id }))
-      setShowNewProduto(false); setNewProdNome('')
-    } catch { toast.error('Erro ao criar produto') }
-  }
+  // Veiculos de um motorista
+  const veiculosDoMot = (motId: string) => veiculos.filter((v: any) => v.cadastro_id === motId)
 
   const loadOrdemTransps = async (ordemId: string) => {
     try {
@@ -106,12 +100,13 @@ export default function Ordens() {
     } catch { setOrdemTransps([]) }
   }
 
-  const openNew = () => { setEditing(null); setForm(emptyForm); setOrdemTransps([]); setShowForm(true) }
+  const openNew = () => { setEditing(null); setForm(emptyForm); setOrdemTransps([]); setSelectedTranspId(''); setShowForm(true) }
   const openEdit = async (item: any) => {
     setEditing(item)
     setForm({
       nome_ordem: item.nome_ordem || '',
       status: item.status || 'pendente',
+      operacao_id: item.operacao_id || '',
       origem_id: item.origem_id, destino_id: item.destino_id,
       produto_id: item.produto_id,
       preco_id: item.preco_id || '',
@@ -119,6 +114,7 @@ export default function Ordens() {
       unidade: item.unidade || 'ton',
       observacoes: item.observacoes || '', ativo: item.ativo,
     })
+    setSelectedTranspId('')
     await loadOrdemTransps(item.id)
     setShowForm(true)
   }
@@ -131,6 +127,7 @@ export default function Ordens() {
     const payload: any = {
       nome_ordem: form.nome_ordem,
       status: form.status,
+      operacao_id: form.operacao_id || null,
       origem_id: form.origem_id,
       destino_id: form.destino_id,
       produto_id: form.produto_id,
@@ -148,7 +145,6 @@ export default function Ordens() {
       } else {
         result = await createOrdem(payload)
         toast.success('Ordem criada')
-        // Abrir para editar para poder adicionar transportadores
         setEditing(result)
         await loadOrdemTransps(result.id)
       }
@@ -156,50 +152,52 @@ export default function Ordens() {
     } catch (err: any) { toast.error('Erro ao salvar: ' + (err?.message || '')); console.error(err) }
   }
 
-  const handleAddTransportadora = async () => {
-    if (!editing?.id || !addTranspId) return
-    // Ao selecionar transportadora, traz motoristas vinculados a ela
-    const motoristosVinculados = allMotoristas.filter(m => m.transportador_id === addTranspId)
+  // Ao selecionar transportadora, carregar seus motoristas/placas automaticamente
+  const handleSelectTransp = async (transpId: string) => {
+    if (transpId === '__novo__') { setOverlayTarget('transportadora'); return }
+    setSelectedTranspId(transpId)
+    if (!editing?.id || !transpId) return
+
+    const motorsVinculados = allMotoristas.filter(m => m.transportador_id === transpId)
     try {
-      if (motoristosVinculados.length > 0) {
-        // Adicionar cada motorista vinculado
-        for (const mot of motoristosVinculados) {
-          const veiculo = veiculos.find((v: any) => v.cadastro_id === mot.id)
+      // Adicionar transportadora com todos seus motoristas
+      if (motorsVinculados.length > 0) {
+        for (const mot of motorsVinculados) {
+          const veic = veiculos.find((v: any) => v.cadastro_id === mot.id)
           await addOrdemTransportador({
             ordem_id: editing.id,
-            transportador_id: addTranspId,
+            transportador_id: transpId,
             motorista_id: mot.id,
-            veiculo_id: veiculo?.id || null,
+            veiculo_id: veic?.id || null,
           })
         }
-        toast.success(`Transportadora + ${motoristosVinculados.length} motorista(s) adicionado(s)`)
+        toast.success(`Transportadora + ${motorsVinculados.length} motorista(s) vinculado(s)`)
       } else {
         await addOrdemTransportador({
           ordem_id: editing.id,
-          transportador_id: addTranspId,
+          transportador_id: transpId,
           motorista_id: null,
           veiculo_id: null,
         })
         toast.success('Transportadora adicionada')
       }
-      setAddTranspId('')
       await loadOrdemTransps(editing.id)
     } catch (err: any) { toast.error('Erro: ' + (err?.message || '')) }
   }
 
-  const handleAddMotorista = async () => {
-    if (!editing?.id || !addMotoristaId) return
-    const mot = allMotoristas.find(m => m.id === addMotoristaId)
-    const veiculo = veiculos.find((v: any) => v.cadastro_id === addMotoristaId)
+  const handleAddMotoristaAvulso = async (motId: string) => {
+    if (motId === '__novo__') { setOverlayTarget('motorista'); return }
+    if (!editing?.id || !motId) return
+    const mot = allMotoristas.find(m => m.id === motId)
+    const veic = veiculos.find((v: any) => v.cadastro_id === motId)
     try {
       await addOrdemTransportador({
         ordem_id: editing.id,
         transportador_id: mot?.transportador_id || null,
-        motorista_id: addMotoristaId,
-        veiculo_id: veiculo?.id || null,
+        motorista_id: motId,
+        veiculo_id: veic?.id || null,
       })
       toast.success('Motorista adicionado')
-      setAddMotoristaId('')
       await loadOrdemTransps(editing.id)
     } catch (err: any) { toast.error('Erro: ' + (err?.message || '')) }
   }
@@ -217,6 +215,23 @@ export default function Ordens() {
     catch { toast.error('Erro ao remover') }
   }
 
+  // Ao fechar overlay, recarregar dados
+  const closeOverlay = () => { setOverlayTarget(null); reloadData() }
+
+  const handleSelectChange = (field: string, value: string) => {
+    if (value === '__novo__') {
+      if (field === 'origem_id' || field === 'destino_id') setOverlayTarget('cadastro')
+      else if (field === 'produto_id') setOverlayTarget('produto')
+      else if (field === 'preco_id') setOverlayTarget('preco')
+      return
+    }
+    if (field === 'origem_id' || field === 'destino_id') {
+      setForm(prev => ({ ...prev, [field]: value, preco_id: '' }))
+    } else {
+      setForm(prev => ({ ...prev, [field]: value }))
+    }
+  }
+
   const statusInfo = (s: string) => STATUS_OPTIONS.find(x => x.value === s) || STATUS_OPTIONS[0]
 
   return (
@@ -230,16 +245,16 @@ export default function Ordens() {
 
       {loading ? <p className="text-gray-500">Carregando...</p> : (
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-x-auto -mx-3 sm:mx-0">
-          <table className="w-full text-sm min-w-[700px]">
+          <table className="w-full text-sm min-w-[800px]">
             <thead className="bg-gray-50 border-b">
               <tr>
                 <th className="text-left px-4 py-3 font-semibold text-gray-600">Numero</th>
+                <th className="text-left px-4 py-3 font-semibold text-gray-600">Operacao</th>
                 <th className="text-left px-4 py-3 font-semibold text-gray-600">Nome</th>
                 <th className="text-left px-4 py-3 font-semibold text-gray-600">Status</th>
                 <th className="text-left px-4 py-3 font-semibold text-gray-600">Origem</th>
                 <th className="text-left px-4 py-3 font-semibold text-gray-600">Destino</th>
                 <th className="text-left px-4 py-3 font-semibold text-gray-600">Produto</th>
-                <th className="text-right px-4 py-3 font-semibold text-gray-600">Qtd</th>
                 <th className="text-right px-4 py-3 font-semibold text-gray-600">Acoes</th>
               </tr>
             </thead>
@@ -249,12 +264,12 @@ export default function Ordens() {
                 return (
                   <tr key={item.id} className="hover:bg-gray-50">
                     <td className="px-4 py-3 font-mono text-xs text-blue-600 font-semibold">{item.numero_ordem_fmt || item.numero_ordem}</td>
+                    <td className="px-4 py-3 text-xs text-gray-500">{item.operacao_nome || '-'}</td>
                     <td className="px-4 py-3 font-medium">{item.nome_ordem || '-'}</td>
                     <td className="px-4 py-3"><span className={`px-2 py-1 rounded-full text-xs font-medium ${st.color}`}>{st.label}</span></td>
                     <td className="px-4 py-3">{item.origem_nome}</td>
                     <td className="px-4 py-3">{item.destino_nome}</td>
                     <td className="px-4 py-3">{item.produto_nome}</td>
-                    <td className="px-4 py-3 text-right">{item.quantidade_prevista ? `${item.quantidade_prevista} ${item.unidade}` : '-'}</td>
                     <td className="px-4 py-3 text-right space-x-1">
                       <button onClick={() => openEdit(item)} className="p-1.5 text-blue-600 hover:bg-blue-50 rounded"><Pencil className="w-4 h-4" /></button>
                       <button onClick={() => remove(item.id)} className="p-1.5 text-red-600 hover:bg-red-50 rounded"><Trash2 className="w-4 h-4" /></button>
@@ -278,11 +293,22 @@ export default function Ordens() {
               <button onClick={() => { setShowForm(false); load() }} className="p-1 hover:bg-gray-100 rounded"><X className="w-5 h-5" /></button>
             </div>
             <div className="p-4 space-y-3">
+
+              {/* Operacao */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Operacao</label>
+                <select value={form.operacao_id} onChange={e => setForm({...form, operacao_id: e.target.value})}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent">
+                  <option value="">Nenhuma (avulsa)</option>
+                  {operacoes.map((op: any) => <option key={op.id} value={op.id}>{op.nome}</option>)}
+                </select>
+              </div>
+
               {/* Nome da Ordem */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Nome da Ordem *</label>
                 <input type="text" value={form.nome_ordem} onChange={e => setForm({...form, nome_ordem: e.target.value})}
-                  placeholder="Ex: Transporte Soja Catalao"
+                  placeholder="Ex: Colheita GO SJ 25/26"
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent" />
               </div>
               {editing && (
@@ -293,57 +319,21 @@ export default function Ordens() {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Origem *</label>
-                  <select value={form.origem_id} onChange={e => {
-                    if (e.target.value === '__novo__') { setShowNewOrigem(true); return }
-                    setForm({...form, origem_id: e.target.value, preco_id: ''})
-                  }} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent">
+                  <select value={form.origem_id} onChange={e => handleSelectChange('origem_id', e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent">
                     <option value="">Selecione...</option>
                     {origens.map((l: any) => <option key={l.id} value={l.id}>{l.nome_fantasia || l.nome}</option>)}
-                    <option value="__novo__">+ Novo cadastro...</option>
+                    <option value="__novo__" className="font-semibold text-green-700 bg-green-50">{NOVO_LABEL}</option>
                   </select>
-                  {showNewOrigem && (
-                    <div className="mt-2 p-3 border border-green-300 bg-green-50 rounded-lg space-y-2">
-                      <input type="text" placeholder="Nome *" value={newCadNome} onChange={e => setNewCadNome(e.target.value)} className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm" />
-                      <div className="flex gap-2">
-                        <input type="text" placeholder="UF" value={newCadUf} onChange={e => setNewCadUf(e.target.value)} className="w-16 px-2 py-1.5 border border-gray-300 rounded text-sm" />
-                        <input type="text" placeholder="Cidade *" value={newCadCidade} onChange={e => setNewCadCidade(e.target.value)} className="flex-1 px-2 py-1.5 border border-gray-300 rounded text-sm" />
-                        <select value={newCadTipo} onChange={e => setNewCadTipo(e.target.value)} className="px-2 py-1.5 border border-gray-300 rounded text-sm">
-                          {TIPOS_ORIGEM.map(t => <option key={t} value={t}>{t}</option>)}
-                        </select>
-                      </div>
-                      <div className="flex gap-2">
-                        <button type="button" onClick={() => criarCadastroInline('origem')} className="px-3 py-1.5 bg-green-600 text-white rounded text-sm hover:bg-green-700">Salvar</button>
-                        <button type="button" onClick={() => setShowNewOrigem(false)} className="px-3 py-1.5 text-gray-600 border rounded text-sm hover:bg-gray-50">Cancelar</button>
-                      </div>
-                    </div>
-                  )}
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Destino *</label>
-                  <select value={form.destino_id} onChange={e => {
-                    if (e.target.value === '__novo__') { setShowNewDestino(true); return }
-                    setForm({...form, destino_id: e.target.value, preco_id: ''})
-                  }} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent">
+                  <select value={form.destino_id} onChange={e => handleSelectChange('destino_id', e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent">
                     <option value="">Selecione...</option>
                     {origens.map((l: any) => <option key={l.id} value={l.id}>{l.nome_fantasia || l.nome}</option>)}
-                    <option value="__novo__">+ Novo cadastro...</option>
+                    <option value="__novo__" className="font-semibold text-green-700 bg-green-50">{NOVO_LABEL}</option>
                   </select>
-                  {showNewDestino && (
-                    <div className="mt-2 p-3 border border-green-300 bg-green-50 rounded-lg space-y-2">
-                      <input type="text" placeholder="Nome *" value={newCadNome} onChange={e => setNewCadNome(e.target.value)} className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm" />
-                      <div className="flex gap-2">
-                        <input type="text" placeholder="UF" value={newCadUf} onChange={e => setNewCadUf(e.target.value)} className="w-16 px-2 py-1.5 border border-gray-300 rounded text-sm" />
-                        <input type="text" placeholder="Cidade *" value={newCadCidade} onChange={e => setNewCadCidade(e.target.value)} className="flex-1 px-2 py-1.5 border border-gray-300 rounded text-sm" />
-                        <select value={newCadTipo} onChange={e => setNewCadTipo(e.target.value)} className="px-2 py-1.5 border border-gray-300 rounded text-sm">
-                          {TIPOS_ORIGEM.map(t => <option key={t} value={t}>{t}</option>)}
-                        </select>
-                      </div>
-                      <div className="flex gap-2">
-                        <button type="button" onClick={() => criarCadastroInline('destino')} className="px-3 py-1.5 bg-green-600 text-white rounded text-sm hover:bg-green-700">Salvar</button>
-                        <button type="button" onClick={() => setShowNewDestino(false)} className="px-3 py-1.5 text-gray-600 border rounded text-sm hover:bg-gray-50">Cancelar</button>
-                      </div>
-                    </div>
-                  )}
                 </div>
               </div>
 
@@ -351,26 +341,12 @@ export default function Ordens() {
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Produto *</label>
-                  <select value={form.produto_id} onChange={e => {
-                    if (e.target.value === '__novo__') { setShowNewProduto(true); return }
-                    setForm({...form, produto_id: e.target.value})
-                  }} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent">
+                  <select value={form.produto_id} onChange={e => handleSelectChange('produto_id', e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent">
                     <option value="">Selecione...</option>
                     {produtos.map((p: any) => <option key={p.id} value={p.id}>{p.nome}</option>)}
-                    <option value="__novo__">+ Novo produto...</option>
+                    <option value="__novo__" className="font-semibold text-green-700 bg-green-50">{NOVO_PROD_LABEL}</option>
                   </select>
-                  {showNewProduto && (
-                    <div className="mt-2 p-3 border border-green-300 bg-green-50 rounded-lg space-y-2">
-                      <input type="text" placeholder="Nome do produto *" value={newProdNome} onChange={e => setNewProdNome(e.target.value)} className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm" />
-                      <div className="flex gap-2">
-                        <select value={newProdTipo} onChange={e => setNewProdTipo(e.target.value)} className="px-2 py-1.5 border border-gray-300 rounded text-sm">
-                          <option value="Grao">Grao</option><option value="Insumo">Insumo</option>
-                        </select>
-                        <button type="button" onClick={criarProdutoInline} className="px-3 py-1.5 bg-green-600 text-white rounded text-sm hover:bg-green-700">Salvar</button>
-                        <button type="button" onClick={() => setShowNewProduto(false)} className="px-3 py-1.5 text-gray-600 border rounded text-sm hover:bg-gray-50">Cancelar</button>
-                      </div>
-                    </div>
-                  )}
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Qtd Prevista</label>
@@ -391,10 +367,11 @@ export default function Ordens() {
                 <label className="block text-sm font-medium text-gray-700 mb-1">Preco Contratado (vinculo)
                   {form.origem_id && form.destino_id && <span className="text-xs text-green-600 ml-1">filtrado pela rota</span>}
                 </label>
-                <select value={form.preco_id} onChange={e => setForm({...form, preco_id: e.target.value})}
+                <select value={form.preco_id} onChange={e => handleSelectChange('preco_id', e.target.value)}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent">
                   <option value="">Nenhum</option>
                   {precosFiltrados.map((p: any) => <option key={p.id} value={p.id}>{p.origem_nome} → {p.destino_nome} | {p.produto_nome} | {p.valor} {p.unidade_preco}</option>)}
+                  <option value="__novo__" className="font-semibold text-green-700 bg-green-50">{NOVO_PRECO_LABEL}</option>
                 </select>
                 {form.origem_id && form.destino_id && precosFiltrados.length === 0 && (
                   <p className="text-xs text-amber-600 mt-1">Nenhum preco cadastrado para esta rota.</p>
@@ -422,30 +399,33 @@ export default function Ordens() {
                 <div className="border-t pt-4">
                   <h3 className="text-sm font-semibold text-gray-800 mb-3">Transportadores e Motoristas</h3>
 
-                  {/* Adicionar transportadora */}
-                  <div className="flex gap-2 mb-2">
-                    <select value={addTranspId} onChange={e => setAddTranspId(e.target.value)}
-                      className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm">
+                  {/* Selecionar transportadora - ao selecionar, vincula automaticamente motoristas+placas */}
+                  <div className="mb-3">
+                    <label className="block text-xs font-medium text-gray-600 mb-1">Adicionar Transportadora (vincula motoristas automaticamente)</label>
+                    <select value="" onChange={e => handleSelectTransp(e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm">
                       <option value="">Selecionar Transportadora...</option>
-                      {transportadoras.map((t: any) => <option key={t.id} value={t.id}>{t.nome_fantasia || t.nome}</option>)}
+                      {transportadoras.map((t: any) => {
+                        const mots = allMotoristas.filter(m => m.transportador_id === t.id)
+                        return <option key={t.id} value={t.id}>{t.nome_fantasia || t.nome} ({mots.length} mot.)</option>
+                      })}
+                      <option value="__novo__" className="font-semibold text-green-700 bg-green-50">{NOVO_TRANSP_LABEL}</option>
                     </select>
-                    <button type="button" onClick={() => { if (addTranspId) handleAddTransportadora(); else toast.error('Selecione uma transportadora') }}
-                      className="flex items-center gap-1 px-3 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 text-sm whitespace-nowrap cursor-pointer">
-                      <Truck className="w-4 h-4" /> + Transportadora
-                    </button>
                   </div>
 
                   {/* Adicionar motorista avulso */}
-                  <div className="flex gap-2 mb-3">
-                    <select value={addMotoristaId} onChange={e => setAddMotoristaId(e.target.value)}
-                      className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm">
+                  <div className="mb-3">
+                    <label className="block text-xs font-medium text-gray-600 mb-1">Ou adicionar motorista avulso</label>
+                    <select value="" onChange={e => handleAddMotoristaAvulso(e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm">
                       <option value="">Selecionar Motorista...</option>
-                      {allMotoristas.map((m: any) => <option key={m.id} value={m.id}>{m.nome_fantasia || m.nome}</option>)}
+                      {allMotoristas.map((m: any) => {
+                        const veics = veiculos.filter((v: any) => v.cadastro_id === m.id)
+                        const placaStr = veics.map((v: any) => v.placa).join(', ')
+                        return <option key={m.id} value={m.id}>{m.nome_fantasia || m.nome}{placaStr ? ` [${placaStr}]` : ''}</option>
+                      })}
+                      <option value="__novo__" className="font-semibold text-green-700 bg-green-50">{NOVO_MOT_LABEL}</option>
                     </select>
-                    <button type="button" onClick={() => { if (addMotoristaId) handleAddMotorista(); else toast.error('Selecione um motorista') }}
-                      className="flex items-center gap-1 px-3 py-2 bg-indigo-500 text-white rounded-lg hover:bg-indigo-600 text-sm whitespace-nowrap cursor-pointer">
-                      <User className="w-4 h-4" /> + Motorista
-                    </button>
                   </div>
 
                   {/* Lista de vinculos */}
@@ -453,7 +433,7 @@ export default function Ordens() {
                     <div className="space-y-2">
                       {ordemTransps.map((ot: any) => (
                         <div key={ot.id} className="flex items-center justify-between bg-gray-50 rounded-lg px-3 py-2 border">
-                          <div className="flex items-center gap-3 text-sm">
+                          <div className="flex items-center gap-2 text-sm flex-wrap">
                             {ot.transportador && (
                               <span className="flex items-center gap-1 text-orange-700 font-medium">
                                 <Truck className="w-3.5 h-3.5" />{ot.transportador.nome_fantasia || ot.transportador.nome}
@@ -465,10 +445,12 @@ export default function Ordens() {
                               </span>
                             )}
                             {ot.veiculos && (
-                              <span className="text-xs text-gray-500 font-mono">{ot.veiculos.placa}</span>
+                              <span className="flex items-center gap-1 text-xs text-gray-500 font-mono bg-white px-1.5 py-0.5 rounded border">
+                                <CarFront className="w-3 h-3" />{ot.veiculos.placa}
+                              </span>
                             )}
                           </div>
-                          <button onClick={() => handleRemoveTransp(ot.id)} className="p-1 text-red-500 hover:bg-red-50 rounded">
+                          <button onClick={() => handleRemoveTransp(ot.id)} className="p-1 text-red-500 hover:bg-red-50 rounded flex-shrink-0">
                             <Minus className="w-4 h-4" />
                           </button>
                         </div>
@@ -486,6 +468,40 @@ export default function Ordens() {
                 <button onClick={save} className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700">Salvar Alteracoes</button>
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* Overlay para navegar a outra tela */}
+      {overlayTarget && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-[60]">
+          <div className="bg-white sm:rounded-xl shadow-2xl w-full max-w-xl sm:mx-4 max-h-screen sm:max-h-[85vh] overflow-y-auto">
+            <div className="flex items-center justify-between p-4 border-b bg-green-50">
+              <h2 className="text-base font-semibold text-green-800">
+                {overlayTarget === 'cadastro' && 'Ir para Cadastros'}
+                {overlayTarget === 'produto' && 'Ir para Produtos'}
+                {overlayTarget === 'preco' && 'Ir para Precos Contratados'}
+                {overlayTarget === 'transportadora' && 'Ir para Cadastros (Transportadora)'}
+                {overlayTarget === 'motorista' && 'Ir para Cadastros (Motorista)'}
+              </h2>
+              <button onClick={closeOverlay} className="p-1 hover:bg-gray-100 rounded"><X className="w-5 h-5" /></button>
+            </div>
+            <div className="p-6 text-center space-y-4">
+              <p className="text-gray-600 text-sm">
+                Para criar um novo registro, acesse a pagina correspondente pelo menu lateral.
+                Ao voltar, os dados estarao atualizados automaticamente.
+              </p>
+              <div className="flex justify-center gap-3">
+                <a href={overlayTarget === 'produto' ? '/produtos' : overlayTarget === 'preco' ? '/precos' : '/cadastros'}
+                  target="_blank" rel="noopener noreferrer"
+                  className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 text-sm font-medium">
+                  Abrir em nova aba
+                </a>
+                <button onClick={closeOverlay} className="px-4 py-2 text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-50 text-sm">
+                  Fechar e Atualizar
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}

@@ -1,7 +1,7 @@
 import { useEffect, useState, useRef } from 'react'
 import { Plus, Pencil, Trash2, X, Camera, Upload, Loader2, FileText, Sparkles } from 'lucide-react'
 import toast from 'react-hot-toast'
-import { getRomaneios, createRomaneio, updateRomaneio, deleteRomaneio, getOrdens } from '../services/api'
+import { getRomaneios, createRomaneio, updateRomaneio, deleteRomaneio, getOrdens, getOperacoes } from '../services/api'
 
 const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY || ''
 
@@ -12,7 +12,7 @@ const TIPOS_DOC = [
 ]
 
 const emptyForm = {
-  ordem_id: '',
+  operacao_id: '', ordem_id: '',
   numero_ticket: '', tipo_documento: 'ticket_pesagem', data_emissao: '',
   local_pesagem: '', fornecedor_destinatario: '', produtor: '',
   cnpj_cpf: '', placa: '', motorista: '', transportadora: '',
@@ -28,6 +28,7 @@ const emptyForm = {
 export default function Romaneios() {
   const [items, setItems] = useState<any[]>([])
   const [ordens, setOrdens] = useState<any[]>([])
+  const [operacoes, setOperacoes] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [showForm, setShowForm] = useState(false)
   const [editing, setEditing] = useState<any>(null)
@@ -39,8 +40,8 @@ export default function Romaneios() {
 
   const load = () => {
     setLoading(true)
-    Promise.all([getRomaneios(), getOrdens()])
-      .then(([r, o]) => { setItems(r); setOrdens(o) })
+    Promise.all([getRomaneios(), getOrdens(), getOperacoes()])
+      .then(([r, o, ops]) => { setItems(r); setOrdens(o); setOperacoes(ops) })
       .catch(() => toast.error('Erro ao carregar'))
       .finally(() => setLoading(false))
   }
@@ -50,7 +51,7 @@ export default function Romaneios() {
   const openEdit = (item: any) => {
     setEditing(item)
     setForm({
-      ordem_id: item.ordem_id || '',
+      operacao_id: item.operacao_id || '', ordem_id: item.ordem_id || '',
       numero_ticket: item.numero_ticket || '', tipo_documento: item.tipo_documento || 'ticket_pesagem',
       data_emissao: item.data_emissao || '', local_pesagem: item.local_pesagem || '',
       fornecedor_destinatario: item.fornecedor_destinatario || '', produtor: item.produtor || '',
@@ -186,6 +187,11 @@ Use 0 para campos numericos nao encontrados e "" para textos. Pesos em KG.`
     finally { setOcrLoading(false) }
   }
 
+  // Ordens filtradas pela operação selecionada
+  const ordensFiltradas = form.operacao_id
+    ? ordens.filter((o: any) => o.operacao_id === form.operacao_id)
+    : ordens
+
   const save = async () => {
     if (!form.ordem_id) { toast.error('Selecione uma Ordem de Carregamento'); return }
     const payload: any = {}
@@ -273,18 +279,28 @@ Use 0 para campos numericos nao encontrados e "" para textos. Pesos em KG.`
             </div>
             <div className="p-4 space-y-4">
 
-              {/* Ordem de Carregamento vinculada */}
-              <div className="border-2 border-orange-200 bg-orange-50 rounded-lg p-3">
-                <label className="block text-sm font-semibold text-orange-700 mb-1">Ordem de Carregamento *</label>
-                <select value={form.ordem_id} onChange={e => setForm({...form, ordem_id: e.target.value})}
-                  className="w-full px-3 py-2 border border-orange-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent bg-white">
-                  <option value="">Selecione a Ordem...</option>
-                  {ordens.map((o: any) => (
-                    <option key={o.id} value={o.id}>
-                      {o.numero_ordem_fmt || o.numero_ordem} - {o.nome_ordem || ''} ({o.origem_nome} → {o.destino_nome})
-                    </option>
-                  ))}
-                </select>
+              {/* Operacao + Ordem de Carregamento vinculada */}
+              <div className="border-2 border-orange-200 bg-orange-50 rounded-lg p-3 space-y-3">
+                <div>
+                  <label className="block text-sm font-semibold text-orange-700 mb-1">Operacao</label>
+                  <select value={form.operacao_id} onChange={e => setForm({...form, operacao_id: e.target.value, ordem_id: ''})}
+                    className="w-full px-3 py-2 border border-orange-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent bg-white">
+                    <option value="">Todas as operacoes</option>
+                    {operacoes.map((op: any) => <option key={op.id} value={op.id}>{op.nome}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-semibold text-orange-700 mb-1">Ordem de Carregamento *</label>
+                  <select value={form.ordem_id} onChange={e => setForm({...form, ordem_id: e.target.value})}
+                    className="w-full px-3 py-2 border border-orange-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent bg-white">
+                    <option value="">Selecione a Ordem...</option>
+                    {ordensFiltradas.map((o: any) => (
+                      <option key={o.id} value={o.id}>
+                        {o.numero_ordem_fmt || o.numero_ordem} - {o.nome_ordem || ''} ({o.origem_nome} → {o.destino_nome})
+                      </option>
+                    ))}
+                  </select>
+                </div>
               </div>
 
               {/* Upload / Camera com OCR */}
