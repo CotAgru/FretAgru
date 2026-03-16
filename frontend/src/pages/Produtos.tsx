@@ -5,7 +5,7 @@ import { getProdutos, createProduto, updateProduto, deleteProduto } from '../ser
 
 const TIPOS = ['Grao', 'Insumo']
 const UNIDADES = ['ton', 'kg', 'sc', 'l']
-const emptyForm = { nome: '', tipo: 'Grao', unidade_medida: 'ton', observacoes: '', ativo: 1 }
+const emptyForm = { nome: '', tipo: 'Grao', unidade_medida: 'ton', observacoes: '', ativo: true }
 
 export default function Produtos() {
   const [items, setItems] = useState<any[]>([])

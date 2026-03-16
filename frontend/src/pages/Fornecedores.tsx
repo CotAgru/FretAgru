@@ -5,11 +5,11 @@ import { getFornecedores, createFornecedor, updateFornecedor, deleteFornecedor }
 
 interface Fornecedor {
   id: string; nome: string; cpf_cnpj: string; telefone: string; email: string;
-  endereco: string; cidade: string; estado: string; observacoes: string; ativo: number;
+  endereco: string; cidade: string; estado: string; observacoes: string; ativo: boolean;
 }
 
 const ESTADOS = ['AC','AL','AP','AM','BA','CE','DF','ES','GO','MA','MT','MS','MG','PA','PB','PR','PE','PI','RJ','RN','RS','RO','RR','SC','SP','SE','TO']
-const emptyForm = { nome: '', cpf_cnpj: '', telefone: '', email: '', endereco: '', cidade: '', estado: 'GO', observacoes: '', ativo: 1 }
+const emptyForm = { nome: '', cpf_cnpj: '', telefone: '', email: '', endereco: '', cidade: '', estado: 'GO', observacoes: '', ativo: true }
 
 export default function Fornecedores() {
   const [items, setItems] = useState<Fornecedor[]>([])
@@ -21,10 +21,16 @@ export default function Fornecedores() {
 
   const load = () => {
     setLoading(true)
-    getFornecedores(busca ? { busca } : undefined).then(setItems).catch(() => toast.error('Erro ao carregar')).finally(() => setLoading(false))
+    getFornecedores().then(setItems).catch(() => toast.error('Erro ao carregar')).finally(() => setLoading(false))
   }
 
-  useEffect(() => { load() }, [busca])
+  useEffect(() => { load() }, [])
+
+  const filtered = items.filter(i => {
+    if (!busca) return true
+    const term = busca.toLowerCase()
+    return i.nome?.toLowerCase().includes(term) || i.cpf_cnpj?.toLowerCase().includes(term) || i.cidade?.toLowerCase().includes(term)
+  })
 
   const openNew = () => { setEditing(null); setForm(emptyForm); setShowForm(true) }
   const openEdit = (item: Fornecedor) => {
@@ -86,7 +92,7 @@ export default function Fornecedores() {
               </tr>
             </thead>
             <tbody className="divide-y">
-              {items.map(item => (
+              {filtered.map(item => (
                 <tr key={item.id} className="hover:bg-gray-50">
                   <td className="px-4 py-3 font-medium">{item.nome}</td>
                   <td className="px-4 py-3 text-gray-600">{item.cpf_cnpj || '-'}</td>

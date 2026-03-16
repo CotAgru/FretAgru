@@ -4,7 +4,7 @@ import toast from 'react-hot-toast'
 import { getPrecos, createPreco, updatePreco, deletePreco, getLocais, getProdutos, getFornecedores } from '../services/api'
 
 const UNIDADES_PRECO = ['R$/ton', 'R$/sc', 'R$/km', 'R$/viagem']
-const emptyForm = { origem_id: '', destino_id: '', produto_id: '', fornecedor_id: '', valor: '', unidade_preco: 'R$/ton', distancia_km: '', vigencia_inicio: '', vigencia_fim: '', observacoes: '', ativo: 1 }
+const emptyForm = { origem_id: '', destino_id: '', produto_id: '', fornecedor_id: '', valor: '', unidade_preco: 'R$/ton', distancia_km: '', vigencia_inicio: '', vigencia_fim: '', observacoes: '', ativo: true }
 
 export default function Precos() {
   const [items, setItems] = useState<any[]>([])

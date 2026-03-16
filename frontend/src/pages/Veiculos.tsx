@@ -4,7 +4,7 @@ import toast from 'react-hot-toast'
 import { getVeiculos, createVeiculo, updateVeiculo, deleteVeiculo, getFornecedores } from '../services/api'
 
 const TIPOS = ['Truck', 'Bi-Truck', 'Carreta', 'Bitrem', 'Rodotrem', 'Outro']
-const emptyForm = { fornecedor_id: '', placa: '', tipo: 'Carreta', marca: '', modelo: '', ano: '', capacidade_kg: '', observacoes: '', ativo: 1 }
+const emptyForm = { fornecedor_id: '', placa: '', tipo: 'Carreta', marca: '', modelo: '', ano: '', capacidade_kg: '', observacoes: '', ativo: true }
 
 export default function Veiculos() {
   const [items, setItems] = useState<any[]>([])

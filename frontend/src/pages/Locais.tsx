@@ -5,7 +5,7 @@ import { getLocais, createLocal, updateLocal, deleteLocal } from '../services/ap
 
 const TIPOS = ['Fazenda', 'Armazem', 'Industria', 'Porto', 'Fornecedor', 'Outro']
 const ESTADOS = ['AC','AL','AP','AM','BA','CE','DF','ES','GO','MA','MT','MS','MG','PA','PB','PR','PE','PI','RJ','RN','RS','RO','RR','SC','SP','SE','TO']
-const emptyForm = { nome: '', tipo: 'Fazenda', endereco: '', cidade: '', estado: 'GO', observacoes: '', ativo: 1 }
+const emptyForm = { nome: '', tipo: 'Fazenda', endereco: '', cidade: '', estado: 'GO', observacoes: '', ativo: true }
 
 export default function Locais() {
   const [items, setItems] = useState<any[]>([])
