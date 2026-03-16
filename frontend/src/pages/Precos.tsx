@@ -1,16 +1,18 @@
 import { useEffect, useState } from 'react'
 import { Plus, Pencil, Trash2, X } from 'lucide-react'
 import toast from 'react-hot-toast'
-import { getPrecos, createPreco, updatePreco, deletePreco, getLocais, getProdutos, getFornecedores } from '../services/api'
+import { getPrecos, createPreco, updatePreco, deletePreco, getCadastros, getProdutos } from '../services/api'
 
 const UNIDADES_PRECO = ['R$/ton', 'R$/sc', 'R$/km', 'R$/viagem']
+const TIPOS_ORIGEM_DESTINO = ['Fazenda', 'Armazem', 'Industria', 'Porto', 'Fornecedor']
+const TIPOS_TRANSPORTADOR = ['Transportadora', 'Motorista']
 const emptyForm = { origem_id: '', destino_id: '', produto_id: '', fornecedor_id: '', valor: '', unidade_preco: 'R$/ton', distancia_km: '', vigencia_inicio: '', vigencia_fim: '', observacoes: '', ativo: true }
 
 export default function Precos() {
   const [items, setItems] = useState<any[]>([])
-  const [locais, setLocais] = useState<any[]>([])
+  const [origemDestino, setOrigemDestino] = useState<any[]>([])
+  const [transportadores, setTransportadores] = useState<any[]>([])
   const [produtos, setProdutos] = useState<any[]>([])
-  const [fornecedores, setFornecedores] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [showForm, setShowForm] = useState(false)
   const [editing, setEditing] = useState<any>(null)
@@ -18,8 +20,13 @@ export default function Precos() {
 
   const load = () => {
     setLoading(true)
-    Promise.all([getPrecos(), getLocais(), getProdutos(), getFornecedores()])
-      .then(([p, l, pr, f]) => { setItems(p); setLocais(l); setProdutos(pr); setFornecedores(f) })
+    Promise.all([getPrecos(), getCadastros(), getProdutos()])
+      .then(([p, c, pr]) => {
+        setItems(p)
+        setOrigemDestino(c.filter((x: any) => (x.tipos || []).some((t: string) => TIPOS_ORIGEM_DESTINO.includes(t))))
+        setTransportadores(c.filter((x: any) => (x.tipos || []).some((t: string) => TIPOS_TRANSPORTADOR.includes(t))))
+        setProdutos(pr)
+      })
       .catch(() => toast.error('Erro ao carregar'))
       .finally(() => setLoading(false))
   }
@@ -34,7 +41,7 @@ export default function Precos() {
 
   const save = async () => {
     if (!form.origem_id || !form.destino_id || !form.produto_id || !form.valor) { toast.error('Origem, destino, produto e valor sao obrigatorios'); return }
-    const data = { ...form, valor: Number(form.valor), distancia_km: form.distancia_km ? Number(form.distancia_km) : null }
+    const data = { ...form, valor: Number(form.valor), distancia_km: form.distancia_km ? Number(form.distancia_km) : null, fornecedor_id: form.fornecedor_id || null }
     try {
       if (editing) { await updatePreco(editing.id, data); toast.success('Preco atualizado') }
       else { await createPreco(data); toast.success('Preco cadastrado') }
@@ -63,7 +70,7 @@ export default function Precos() {
                 <th className="text-left px-4 py-3 font-semibold text-gray-600">Origem</th>
                 <th className="text-left px-4 py-3 font-semibold text-gray-600">Destino</th>
                 <th className="text-left px-4 py-3 font-semibold text-gray-600">Produto</th>
-                <th className="text-left px-4 py-3 font-semibold text-gray-600">Fornecedor</th>
+                <th className="text-left px-4 py-3 font-semibold text-gray-600">Transportador</th>
                 <th className="text-right px-4 py-3 font-semibold text-gray-600">Valor</th>
                 <th className="text-right px-4 py-3 font-semibold text-gray-600">Dist.</th>
                 <th className="text-right px-4 py-3 font-semibold text-gray-600">Acoes</th>
@@ -101,14 +108,14 @@ export default function Precos() {
                 <label className="block text-sm font-medium text-gray-700 mb-1">Origem *</label>
                 <select value={form.origem_id} onChange={e => setForm({...form, origem_id: e.target.value})} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent">
                   <option value="">Selecione...</option>
-                  {locais.map((l: any) => <option key={l.id} value={l.id}>{l.nome} ({l.tipo})</option>)}
+                  {origemDestino.map((l: any) => <option key={l.id} value={l.id}>{l.nome_fantasia || l.nome} ({(l.tipos||[]).join(', ')})</option>)}
                 </select>
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Destino *</label>
                 <select value={form.destino_id} onChange={e => setForm({...form, destino_id: e.target.value})} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent">
                   <option value="">Selecione...</option>
-                  {locais.map((l: any) => <option key={l.id} value={l.id}>{l.nome} ({l.tipo})</option>)}
+                  {origemDestino.map((l: any) => <option key={l.id} value={l.id}>{l.nome_fantasia || l.nome} ({(l.tipos||[]).join(', ')})</option>)}
                 </select>
               </div>
               <div>
@@ -119,10 +126,10 @@ export default function Precos() {
                 </select>
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Fornecedor</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Transportador</label>
                 <select value={form.fornecedor_id} onChange={e => setForm({...form, fornecedor_id: e.target.value})} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent">
                   <option value="">Todos (preco geral)</option>
-                  {fornecedores.map((f: any) => <option key={f.id} value={f.id}>{f.nome}</option>)}
+                  {transportadores.map((f: any) => <option key={f.id} value={f.id}>{f.nome_fantasia || f.nome}</option>)}
                 </select>
               </div>
               <div className="grid grid-cols-3 gap-3">

@@ -1,23 +1,21 @@
 import { useEffect, useState } from 'react'
-import { Users, CarFront, MapPin, Package, DollarSign } from 'lucide-react'
-import { getFornecedores, getVeiculos, getLocais, getProdutos, getPrecos } from '../services/api'
+import { Users, CarFront, Package, DollarSign } from 'lucide-react'
+import { getCadastros, getVeiculos, getProdutos, getPrecos } from '../services/api'
 
 export default function Dashboard() {
-  const [stats, setStats] = useState({ fornecedores: 0, veiculos: 0, locais: 0, produtos: 0, precos: 0 })
+  const [stats, setStats] = useState({ cadastros: 0, veiculos: 0, produtos: 0, precos: 0 })
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     Promise.all([
-      getFornecedores().catch(() => []),
+      getCadastros().catch(() => []),
       getVeiculos().catch(() => []),
-      getLocais().catch(() => []),
       getProdutos().catch(() => []),
       getPrecos().catch(() => []),
-    ]).then(([f, v, l, p, pr]) => {
+    ]).then(([c, v, p, pr]) => {
       setStats({
-        fornecedores: f.length,
+        cadastros: c.length,
         veiculos: v.length,
-        locais: l.length,
         produtos: p.length,
         precos: pr.length,
       })
@@ -26,9 +24,8 @@ export default function Dashboard() {
   }, [])
 
   const cards = [
-    { label: 'Fornecedores', value: stats.fornecedores, icon: Users, color: 'bg-blue-500' },
+    { label: 'Cadastros', value: stats.cadastros, icon: Users, color: 'bg-blue-500' },
     { label: 'Veiculos', value: stats.veiculos, icon: CarFront, color: 'bg-purple-500' },
-    { label: 'Origens/Destinos', value: stats.locais, icon: MapPin, color: 'bg-orange-500' },
     { label: 'Produtos', value: stats.produtos, icon: Package, color: 'bg-emerald-500' },
     { label: 'Precos Contratados', value: stats.precos, icon: DollarSign, color: 'bg-rose-500' },
   ]
@@ -40,7 +37,7 @@ export default function Dashboard() {
       {loading ? (
         <p className="text-gray-500">Carregando...</p>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           {cards.map((card) => {
             const Icon = card.icon
             return (

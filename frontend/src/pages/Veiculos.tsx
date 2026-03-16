@@ -1,14 +1,26 @@
 import { useEffect, useState } from 'react'
 import { Plus, Pencil, Trash2, X } from 'lucide-react'
 import toast from 'react-hot-toast'
-import { getVeiculos, createVeiculo, updateVeiculo, deleteVeiculo, getFornecedores } from '../services/api'
+import { getVeiculos, createVeiculo, updateVeiculo, deleteVeiculo, getCadastros } from '../services/api'
 
-const TIPOS = ['Truck', 'Bi-Truck', 'Carreta', 'Bitrem', 'Rodotrem', 'Outro']
-const emptyForm = { fornecedor_id: '', placa: '', tipo: 'Carreta', marca: '', modelo: '', ano: '', capacidade_kg: '', observacoes: '', ativo: true }
+// Tipos ANTT com correlacao eixos / peso pauta (carga liquida)
+const TIPOS_CAMINHAO = [
+  { nome: 'Toco', eixos: 2, peso_pauta_kg: 8000 },
+  { nome: 'Truck', eixos: 3, peso_pauta_kg: 14000 },
+  { nome: 'Bi-Truck', eixos: 4, peso_pauta_kg: 20000 },
+  { nome: 'Carreta LS', eixos: 5, peso_pauta_kg: 27000 },
+  { nome: 'Carreta', eixos: 6, peso_pauta_kg: 37000 },
+  { nome: 'Bitrem', eixos: 7, peso_pauta_kg: 42000 },
+  { nome: 'Rodotrem', eixos: 9, peso_pauta_kg: 57000 },
+  { nome: 'Treminhao', eixos: 9, peso_pauta_kg: 57000 },
+  { nome: 'Outro', eixos: 0, peso_pauta_kg: 0 },
+]
+
+const emptyForm = { cadastro_id: '', placa: '', tipo_caminhao: 'Carreta', eixos: 6, peso_pauta_kg: 37000, marca: '', modelo: '', ano: '', observacoes: '', ativo: true }
 
 export default function Veiculos() {
   const [items, setItems] = useState<any[]>([])
-  const [fornecedores, setFornecedores] = useState<any[]>([])
+  const [proprietarios, setProprietarios] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [showForm, setShowForm] = useState(false)
   const [editing, setEditing] = useState<any>(null)
@@ -16,23 +28,41 @@ export default function Veiculos() {
 
   const load = () => {
     setLoading(true)
-    Promise.all([getVeiculos(), getFornecedores()])
-      .then(([v, f]) => { setItems(v); setFornecedores(f) })
+    Promise.all([getVeiculos(), getCadastros()])
+      .then(([v, c]) => {
+        setItems(v)
+        setProprietarios(c.filter((x: any) => (x.tipos || []).some((t: string) => ['Transportadora', 'Motorista'].includes(t))))
+      })
       .catch(() => toast.error('Erro ao carregar'))
       .finally(() => setLoading(false))
   }
   useEffect(() => { load() }, [])
 
+  const onTipoChange = (tipo: string) => {
+    const found = TIPOS_CAMINHAO.find(t => t.nome === tipo)
+    setForm(prev => ({
+      ...prev,
+      tipo_caminhao: tipo,
+      eixos: found?.eixos ?? 0,
+      peso_pauta_kg: found?.peso_pauta_kg ?? 0,
+    }))
+  }
+
   const openNew = () => { setEditing(null); setForm(emptyForm); setShowForm(true) }
   const openEdit = (item: any) => {
     setEditing(item)
-    setForm({ fornecedor_id: item.fornecedor_id, placa: item.placa, tipo: item.tipo, marca: item.marca || '', modelo: item.modelo || '', ano: item.ano?.toString() || '', capacidade_kg: item.capacidade_kg?.toString() || '', observacoes: item.observacoes || '', ativo: item.ativo })
+    setForm({
+      cadastro_id: item.cadastro_id, placa: item.placa, tipo_caminhao: item.tipo_caminhao,
+      eixos: item.eixos, peso_pauta_kg: item.peso_pauta_kg,
+      marca: item.marca || '', modelo: item.modelo || '',
+      ano: item.ano?.toString() || '', observacoes: item.observacoes || '', ativo: item.ativo,
+    })
     setShowForm(true)
   }
 
   const save = async () => {
-    if (!form.fornecedor_id || !form.placa || !form.tipo) { toast.error('Fornecedor, placa e tipo sao obrigatorios'); return }
-    const data = { ...form, ano: form.ano ? Number(form.ano) : null, capacidade_kg: form.capacidade_kg ? Number(form.capacidade_kg) : null }
+    if (!form.cadastro_id || !form.placa || !form.tipo_caminhao) { toast.error('Proprietario, placa e tipo sao obrigatorios'); return }
+    const data = { ...form, ano: form.ano ? Number(form.ano) : null }
     try {
       if (editing) { await updateVeiculo(editing.id, data); toast.success('Veiculo atualizado') }
       else { await createVeiculo(data); toast.success('Veiculo cadastrado') }
@@ -59,10 +89,11 @@ export default function Veiculos() {
             <thead className="bg-gray-50 border-b">
               <tr>
                 <th className="text-left px-4 py-3 font-semibold text-gray-600">Placa</th>
-                <th className="text-left px-4 py-3 font-semibold text-gray-600">Tipo</th>
+                <th className="text-left px-4 py-3 font-semibold text-gray-600">Tipo Caminhao</th>
+                <th className="text-center px-4 py-3 font-semibold text-gray-600">Eixos</th>
                 <th className="text-left px-4 py-3 font-semibold text-gray-600">Marca/Modelo</th>
-                <th className="text-left px-4 py-3 font-semibold text-gray-600">Fornecedor</th>
-                <th className="text-left px-4 py-3 font-semibold text-gray-600">Capacidade (kg)</th>
+                <th className="text-left px-4 py-3 font-semibold text-gray-600">Proprietario</th>
+                <th className="text-right px-4 py-3 font-semibold text-gray-600">Peso Pauta (Kg)</th>
                 <th className="text-right px-4 py-3 font-semibold text-gray-600">Acoes</th>
               </tr>
             </thead>
@@ -70,17 +101,18 @@ export default function Veiculos() {
               {items.map((item: any) => (
                 <tr key={item.id} className="hover:bg-gray-50">
                   <td className="px-4 py-3 font-mono font-medium">{item.placa}</td>
-                  <td className="px-4 py-3">{item.tipo}</td>
+                  <td className="px-4 py-3">{item.tipo_caminhao}</td>
+                  <td className="px-4 py-3 text-center">{item.eixos}</td>
                   <td className="px-4 py-3 text-gray-600">{[item.marca, item.modelo].filter(Boolean).join(' ') || '-'}</td>
-                  <td className="px-4 py-3 text-gray-600">{item.fornecedor_nome || '-'}</td>
-                  <td className="px-4 py-3 text-gray-600">{item.capacidade_kg ? Number(item.capacidade_kg).toLocaleString('pt-BR') : '-'}</td>
+                  <td className="px-4 py-3 text-gray-600">{item.proprietario_nome || '-'}</td>
+                  <td className="px-4 py-3 text-right font-semibold">{item.peso_pauta_kg ? Number(item.peso_pauta_kg).toLocaleString('pt-BR') : '-'}</td>
                   <td className="px-4 py-3 text-right space-x-1">
                     <button onClick={() => openEdit(item)} className="p-1.5 text-blue-600 hover:bg-blue-50 rounded"><Pencil className="w-4 h-4" /></button>
                     <button onClick={() => remove(item.id)} className="p-1.5 text-red-600 hover:bg-red-50 rounded"><Trash2 className="w-4 h-4" /></button>
                   </td>
                 </tr>
               ))}
-              {items.length === 0 && <tr><td colSpan={6} className="px-4 py-8 text-center text-gray-400">Nenhum veiculo cadastrado</td></tr>}
+              {items.length === 0 && <tr><td colSpan={7} className="px-4 py-8 text-center text-gray-400">Nenhum veiculo cadastrado</td></tr>}
             </tbody>
           </table>
         </div>
@@ -95,11 +127,11 @@ export default function Veiculos() {
             </div>
             <div className="p-4 space-y-3">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Fornecedor *</label>
-                <select value={form.fornecedor_id} onChange={e => setForm({...form, fornecedor_id: e.target.value})}
+                <label className="block text-sm font-medium text-gray-700 mb-1">Proprietario (Transportadora/Motorista) *</label>
+                <select value={form.cadastro_id} onChange={e => setForm({...form, cadastro_id: e.target.value})}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent">
                   <option value="">Selecione...</option>
-                  {fornecedores.map((f: any) => <option key={f.id} value={f.id}>{f.nome}</option>)}
+                  {proprietarios.map((f: any) => <option key={f.id} value={f.id}>{f.nome_fantasia || f.nome}</option>)}
                 </select>
               </div>
               <div className="grid grid-cols-2 gap-3">
@@ -109,13 +141,28 @@ export default function Veiculos() {
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent" />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Tipo *</label>
-                  <select value={form.tipo} onChange={e => setForm({...form, tipo: e.target.value})}
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Tipo Caminhao *</label>
+                  <select value={form.tipo_caminhao} onChange={e => onTipoChange(e.target.value)}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent">
-                    {TIPOS.map(t => <option key={t} value={t}>{t}</option>)}
+                    {TIPOS_CAMINHAO.map(t => <option key={t.nome} value={t.nome}>{t.nome} ({t.eixos} eixos)</option>)}
                   </select>
                 </div>
               </div>
+
+              {/* Eixos e Peso Pauta (preenchidos automaticamente) */}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Eixos</label>
+                  <input type="number" value={form.eixos} readOnly
+                    className="w-full px-3 py-2 border border-gray-200 rounded-lg bg-gray-50 text-gray-600" />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Peso Pauta (Kg)</label>
+                  <input type="number" value={form.peso_pauta_kg} readOnly
+                    className="w-full px-3 py-2 border border-gray-200 rounded-lg bg-gray-50 text-gray-600 font-semibold" />
+                </div>
+              </div>
+
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Marca</label>
@@ -128,17 +175,10 @@ export default function Veiculos() {
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent" />
                 </div>
               </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Ano</label>
-                  <input type="number" value={form.ano} onChange={e => setForm({...form, ano: e.target.value})}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent" />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Capacidade (kg)</label>
-                  <input type="number" value={form.capacidade_kg} onChange={e => setForm({...form, capacidade_kg: e.target.value})}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent" />
-                </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Ano</label>
+                <input type="number" value={form.ano} onChange={e => setForm({...form, ano: e.target.value})}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent" />
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Observacoes</label>
