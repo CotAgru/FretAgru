@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { Plus, Pencil, Trash2, X, Truck, User, Minus, Check, CarFront, Loader2 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { getOrdens, createOrdem, updateOrdem, deleteOrdem, getCadastros, getProdutos, getVeiculos, getPrecos, getOrdemTransportadores, addOrdemTransportador, removeOrdemTransportador, getOperacoes, createCadastro, createProduto, createPreco } from '../services/api'
@@ -10,6 +10,24 @@ const STATUS_OPTIONS = [
   { value: 'cancelado', label: 'Cancelado', color: 'bg-red-100 text-red-700' },
 ]
 const TIPOS_ORIGEM = ['Fazenda', 'Armazem', 'Industria', 'Porto', 'Fornecedor']
+const TODOS_TIPOS = ['Armazem', 'Fazenda', 'Fornecedor', 'Industria', 'Motorista', 'Outro', 'Porto', 'Transportadora']
+
+const formatPhone = (value: string) => {
+  const digits = value.replace(/\D/g, '').slice(0, 11)
+  if (digits.length === 0) return ''
+  if (digits.length <= 2) return `(${digits}`
+  if (digits.length <= 6) return `(${digits.slice(0,2)}) ${digits.slice(2)}`
+  if (digits.length <= 10) return `(${digits.slice(0,2)}) ${digits.slice(2,6)}-${digits.slice(6)}`
+  return `(${digits.slice(0,2)}) ${digits.slice(2,7)}-${digits.slice(7)}`
+}
+
+const formatCpfCnpj = (value: string) => {
+  const digits = value.replace(/\D/g, '')
+  if (digits.length <= 11) {
+    return digits.replace(/(\d{3})(\d{3})(\d{3})(\d{0,2})/, (_, a, b, c, d) => d ? `${a}.${b}.${c}-${d}` : `${a}.${b}.${c}`)
+  }
+  return digits.slice(0,14).replace(/(\d{2})(\d{3})(\d{3})(\d{4})(\d{0,2})/, (_, a, b, c, d, e) => e ? `${a}.${b}.${c}/${d}-${e}` : `${a}.${b}.${c}/${d}`)
+}
 
 const emptyForm = {
   nome_ordem: '', status: 'pendente', operacao_id: '', origem_id: '', destino_id: '', produto_id: '',
@@ -47,7 +65,11 @@ export default function Ordens() {
   const [popupType, setPopupType] = useState<string | null>(null)
   const [popupContext, setPopupContext] = useState('')
   const [savingPopup, setSavingPopup] = useState(false)
-  const [miniCadForm, setMiniCadForm] = useState({ nome: '', nome_fantasia: '', cpf_cnpj: '', tipos: [] as string[], uf: '', cidade: '', transportador_id: '' })
+  const [miniCadForm, setMiniCadForm] = useState({ cpf_cnpj: '', nome: '', nome_fantasia: '', telefone1: '', telefone2: '', uf: 'GO', cidade: '', tipos: [] as string[], observacoes: '', transportador_id: '' })
+  const [popupUfs, setPopupUfs] = useState<{id:number,sigla:string,nome:string}[]>([])
+  const [popupCidades, setPopupCidades] = useState<{id:number,nome:string}[]>([])
+  const [popupLoadingCidades, setPopupLoadingCidades] = useState(false)
+  const [popupLoadingCnpj, setPopupLoadingCnpj] = useState(false)
   const [miniProdForm, setMiniProdForm] = useState({ nome: '', tipo: 'Grao', unidade_medida: 'ton' })
   const [miniPrecoForm, setMiniPrecoForm] = useState({ origem_id: '', destino_id: '', produto_id: '', fornecedor_id: '', valor: '', unidade_preco: 'R$/ton' })
 
@@ -220,10 +242,58 @@ export default function Ordens() {
     catch { toast.error('Erro ao remover') }
   }
 
+  // === IBGE: carregar UFs uma vez ===
+  useEffect(() => {
+    fetch('https://servicodados.ibge.gov.br/api/v1/localidades/estados?orderBy=nome')
+      .then(r => r.json()).then(setPopupUfs).catch(() => {})
+  }, [])
+
+  // Carregar cidades quando UF do popup mudar
+  const carregarPopupCidades = useCallback((uf: string) => {
+    if (!uf) { setPopupCidades([]); return Promise.resolve([] as {id:number,nome:string}[]) }
+    setPopupLoadingCidades(true)
+    return fetch(`https://servicodados.ibge.gov.br/api/v1/localidades/estados/${uf}/municipios?orderBy=nome`)
+      .then(r => r.json())
+      .then((data: {id:number,nome:string}[]) => { setPopupCidades(data); return data })
+      .catch(() => { setPopupCidades([]); return [] as {id:number,nome:string}[] })
+      .finally(() => setPopupLoadingCidades(false))
+  }, [])
+
+  useEffect(() => {
+    if (popupType === 'cadastro') carregarPopupCidades(miniCadForm.uf)
+  }, [miniCadForm.uf, popupType, carregarPopupCidades])
+
+  // Buscar CNPJ via BrasilAPI
+  const buscarCnpjPopup = async () => {
+    const digits = miniCadForm.cpf_cnpj.replace(/\D/g, '')
+    if (digits.length !== 14) { toast.error('CNPJ deve ter 14 digitos'); return }
+    setPopupLoadingCnpj(true)
+    try {
+      const resp = await fetch(`https://brasilapi.com.br/api/cnpj/v1/${digits}`)
+      if (!resp.ok) throw new Error('CNPJ nao encontrado')
+      const data = await resp.json()
+      const novaUf = data.uf || miniCadForm.uf
+      let cidadesCarregadas: {id:number,nome:string}[] = []
+      if (novaUf) cidadesCarregadas = await carregarPopupCidades(novaUf)
+      const cidadeEncontrada = cidadesCarregadas.find(c => c.nome.toLowerCase() === (data.municipio || '').toLowerCase())
+      setMiniCadForm(prev => ({
+        ...prev,
+        nome: data.razao_social || prev.nome,
+        nome_fantasia: data.nome_fantasia || '',
+        uf: novaUf,
+        cidade: cidadeEncontrada ? cidadeEncontrada.nome : data.municipio || prev.cidade,
+        telefone1: data.ddd_telefone_1 ? `(${data.ddd_telefone_1.substring(0,2)})${data.ddd_telefone_1.substring(2)}` : prev.telefone1,
+        telefone2: data.ddd_telefone_2 ? `(${data.ddd_telefone_2.substring(0,2)})${data.ddd_telefone_2.substring(2)}` : prev.telefone2,
+      }))
+      toast.success('Dados do CNPJ carregados')
+    } catch { toast.error('Erro ao buscar CNPJ') }
+    finally { setPopupLoadingCnpj(false) }
+  }
+
   // === Pop-up open helpers ===
   const openPopupCadastro = (context: string) => {
     const defaultTipos = context === 'transportadora' ? ['Transportadora'] : context === 'motorista' ? ['Motorista'] : []
-    setMiniCadForm({ nome: '', nome_fantasia: '', cpf_cnpj: '', tipos: defaultTipos, uf: '', cidade: '', transportador_id: '' })
+    setMiniCadForm({ cpf_cnpj: '', nome: '', nome_fantasia: '', telefone1: '', telefone2: '', uf: 'GO', cidade: '', tipos: defaultTipos, observacoes: '', transportador_id: '' })
     setPopupContext(context)
     setPopupType('cadastro')
   }
@@ -239,10 +309,24 @@ export default function Ordens() {
   // === Pop-up save handlers ===
   const savePopupCadastro = async () => {
     if (!miniCadForm.nome.trim()) { toast.error('Nome e obrigatorio'); return }
+    if (!miniCadForm.uf) { toast.error('UF e obrigatoria'); return }
+    if (!miniCadForm.cidade) { toast.error('Cidade e obrigatoria'); return }
+    if (miniCadForm.tipos.length === 0) { toast.error('Selecione pelo menos um Tipo'); return }
     setSavingPopup(true)
     try {
-      const payload: any = { nome: miniCadForm.nome, nome_fantasia: miniCadForm.nome_fantasia || null, cpf_cnpj: miniCadForm.cpf_cnpj || null, tipos: miniCadForm.tipos, uf: miniCadForm.uf || null, cidade: miniCadForm.cidade || null, ativo: true }
-      if (popupContext === 'motorista' && miniCadForm.transportador_id) payload.transportador_id = miniCadForm.transportador_id
+      const payload: any = {
+        cpf_cnpj: miniCadForm.cpf_cnpj || null,
+        nome: miniCadForm.nome,
+        nome_fantasia: miniCadForm.nome_fantasia || null,
+        telefone1: miniCadForm.telefone1 || null,
+        telefone2: miniCadForm.telefone2 || null,
+        uf: miniCadForm.uf,
+        cidade: miniCadForm.cidade,
+        tipos: miniCadForm.tipos,
+        observacoes: miniCadForm.observacoes || null,
+        transportador_id: (popupContext === 'motorista' && miniCadForm.transportador_id) ? miniCadForm.transportador_id : null,
+        ativo: true,
+      }
       const created = await createCadastro(payload)
       await reloadData()
       if (popupContext === 'origem') setForm(prev => ({ ...prev, origem_id: created.id, preco_id: '' }))
@@ -536,65 +620,110 @@ export default function Ordens() {
         </div>
       )}
 
-      {/* Pop-up: Novo Cadastro */}
+      {/* Pop-up: Novo Cadastro (formulario completo com IBGE) */}
       {popupType === 'cadastro' && (
         <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-[60]">
-          <div className="bg-white sm:rounded-xl shadow-2xl w-full max-w-md sm:mx-4 max-h-screen sm:max-h-[85vh] overflow-y-auto">
-            <div className="flex items-center justify-between p-4 border-b bg-green-50">
-              <h2 className="text-base font-semibold text-green-800">
+          <div className="bg-white sm:rounded-xl shadow-2xl w-full max-w-lg sm:mx-4 max-h-screen sm:max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between p-4 border-b">
+              <h2 className="text-lg font-semibold text-gray-800">
                 {popupContext === 'transportadora' ? 'Nova Transportadora' : popupContext === 'motorista' ? 'Novo Motorista' : 'Novo Cadastro'}
               </h2>
               <button onClick={() => setPopupType(null)} className="p-1 hover:bg-gray-100 rounded"><X className="w-5 h-5" /></button>
             </div>
             <div className="p-4 space-y-3">
+              {/* CPF/CNPJ com busca */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">CPF / CNPJ</label>
+                <div className="flex gap-2">
+                  <input type="text" value={miniCadForm.cpf_cnpj}
+                    onChange={e => setMiniCadForm({...miniCadForm, cpf_cnpj: formatCpfCnpj(e.target.value)})}
+                    placeholder="00.000.000/0000-00" autoFocus
+                    className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent" />
+                  {miniCadForm.cpf_cnpj.replace(/\D/g, '').length >= 14 && (
+                    <button onClick={buscarCnpjPopup} disabled={popupLoadingCnpj}
+                      className="px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm font-medium disabled:opacity-50 flex items-center gap-1 whitespace-nowrap">
+                      {popupLoadingCnpj ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Buscar'}
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {/* Nome / Razao Social */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Nome / Razao Social *</label>
                 <input type="text" value={miniCadForm.nome} onChange={e => setMiniCadForm({...miniCadForm, nome: e.target.value})}
-                  placeholder="Nome completo ou razao social" autoFocus
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent" />
               </div>
+
+              {/* Nome Fantasia */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Nome Fantasia</label>
                 <input type="text" value={miniCadForm.nome_fantasia} onChange={e => setMiniCadForm({...miniCadForm, nome_fantasia: e.target.value})}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent" />
               </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">CPF / CNPJ</label>
-                <input type="text" value={miniCadForm.cpf_cnpj} onChange={e => setMiniCadForm({...miniCadForm, cpf_cnpj: e.target.value})}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent" />
-              </div>
-              {(popupContext === 'origem' || popupContext === 'destino') && (
+
+              {/* Telefones */}
+              <div className="grid grid-cols-2 gap-2">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1.5">Tipo(s)</label>
-                  <div className="flex flex-wrap gap-2">
-                    {TIPOS_ORIGEM.map(t => (
-                      <label key={t} className="flex items-center gap-1.5 text-sm cursor-pointer">
-                        <input type="checkbox" checked={miniCadForm.tipos.includes(t)}
-                          onChange={e => setMiniCadForm(prev => ({ ...prev, tipos: e.target.checked ? [...prev.tipos, t] : prev.tipos.filter(x => x !== t) }))}
-                          className="rounded border-gray-300 text-green-600 focus:ring-green-500" />
-                        {t}
-                      </label>
-                    ))}
-                  </div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Telefone 1</label>
+                  <input type="text" value={miniCadForm.telefone1}
+                    onChange={e => setMiniCadForm({...miniCadForm, telefone1: formatPhone(e.target.value)})}
+                    placeholder="(00) 00000-0000"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent" />
                 </div>
-              )}
-              {(popupContext === 'transportadora' || popupContext === 'motorista') && (
-                <p className="text-xs text-gray-500 bg-gray-50 px-3 py-2 rounded-lg">
-                  Tipo: <span className="font-semibold">{miniCadForm.tipos.join(', ')}</span>
-                </p>
-              )}
-              <div className="grid grid-cols-3 gap-2">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">UF</label>
-                  <input type="text" maxLength={2} value={miniCadForm.uf} onChange={e => setMiniCadForm({...miniCadForm, uf: e.target.value.toUpperCase()})}
-                    placeholder="GO" className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent" />
-                </div>
-                <div className="col-span-2">
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Cidade</label>
-                  <input type="text" value={miniCadForm.cidade} onChange={e => setMiniCadForm({...miniCadForm, cidade: e.target.value})}
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Telefone 2</label>
+                  <input type="text" value={miniCadForm.telefone2}
+                    onChange={e => setMiniCadForm({...miniCadForm, telefone2: formatPhone(e.target.value)})}
+                    placeholder="(00) 00000-0000"
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent" />
                 </div>
               </div>
+
+              {/* UF + Cidade (IBGE) */}
+              <div className="grid grid-cols-3 gap-2">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">UF *</label>
+                  <select value={miniCadForm.uf}
+                    onChange={e => setMiniCadForm({...miniCadForm, uf: e.target.value, cidade: ''})}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent">
+                    <option value="">Selecione...</option>
+                    {popupUfs.map(u => <option key={u.id} value={u.sigla}>{u.sigla} - {u.nome}</option>)}
+                  </select>
+                </div>
+                <div className="col-span-2">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Cidade * {popupLoadingCidades && <Loader2 className="w-3 h-3 inline animate-spin ml-1" />}
+                  </label>
+                  <select value={miniCadForm.cidade}
+                    onChange={e => setMiniCadForm({...miniCadForm, cidade: e.target.value})}
+                    disabled={popupLoadingCidades || popupCidades.length === 0}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent disabled:bg-gray-100">
+                    <option value="">Selecione...</option>
+                    {popupCidades.map(c => <option key={c.id} value={c.nome}>{c.nome}</option>)}
+                  </select>
+                </div>
+              </div>
+
+              {/* Tipo(s) - chips toggle */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1.5">Tipo * <span className="text-xs text-gray-400 font-normal">(selecione um ou mais)</span></label>
+                <div className="flex flex-wrap gap-1.5">
+                  {TODOS_TIPOS.map(t => (
+                    <button key={t} type="button"
+                      onClick={() => setMiniCadForm(prev => ({ ...prev, tipos: prev.tipos.includes(t) ? prev.tipos.filter(x => x !== t) : [...prev.tipos, t] }))}
+                      className={`px-3 py-1.5 rounded-lg text-sm font-medium border transition-colors ${
+                        miniCadForm.tipos.includes(t)
+                          ? 'bg-green-600 text-white border-green-600'
+                          : 'bg-white text-gray-600 border-gray-300 hover:border-green-400'
+                      }`}>
+                      {t}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Transportadora vinculada (só para motorista) */}
               {popupContext === 'motorista' && (
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Transportadora vinculada</label>
@@ -605,13 +734,20 @@ export default function Ordens() {
                   </select>
                 </div>
               )}
+
+              {/* Observacoes */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Observacoes</label>
+                <textarea value={miniCadForm.observacoes} onChange={e => setMiniCadForm({...miniCadForm, observacoes: e.target.value})} rows={2}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent" />
+              </div>
             </div>
             <div className="flex justify-end gap-2 p-4 border-t">
               <button onClick={() => setPopupType(null)} className="px-4 py-2 text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50 text-sm">Cancelar</button>
               <button onClick={savePopupCadastro} disabled={savingPopup}
                 className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 text-sm font-medium disabled:opacity-50 flex items-center gap-2">
                 {savingPopup && <Loader2 className="w-4 h-4 animate-spin" />}
-                {savingPopup ? 'Salvando...' : 'Criar Cadastro'}
+                {savingPopup ? 'Salvando...' : 'Salvar'}
               </button>
             </div>
           </div>
