@@ -1,7 +1,11 @@
 import { useEffect, useState, useCallback } from 'react'
-import { Plus, Pencil, Trash2, X, Search, Loader2 } from 'lucide-react'
+import { Plus, Pencil, Trash2, X, Search, Loader2, MapPin } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { getCadastros, createCadastro, updateCadastro, deleteCadastro } from '../services/api'
+import { APIProvider, Map, AdvancedMarker } from '@vis.gl/react-google-maps'
+
+const GOOGLE_MAPS_API_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY || ''
+const DEFAULT_CENTER = { lat: -15.7801, lng: -47.9292 }
 
 const TODOS_TIPOS = ['Armazem', 'Fazenda', 'Fornecedor', 'Industria', 'Motorista', 'Outro', 'Porto', 'Transportadora']
 const TIPOS_COM_LOCALIZACAO = ['Fazenda', 'Armazem', 'Industria', 'Porto', 'Fornecedor']
@@ -336,19 +340,47 @@ export default function Cadastros() {
                 </div>
               </div>
 
-              {/* Localizacao (condicional) */}
+              {/* Localizacao com Google Maps (condicional) */}
               {mostraLocalizacao && (
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Localizacao (Lat/Lng)</label>
-                  <div className="grid grid-cols-2 gap-3">
-                    <input type="number" step="any" placeholder="Latitude" value={form.latitude ?? ''}
-                      onChange={e => setForm({...form, latitude: e.target.value ? Number(e.target.value) : null})}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent" />
-                    <input type="number" step="any" placeholder="Longitude" value={form.longitude ?? ''}
-                      onChange={e => setForm({...form, longitude: e.target.value ? Number(e.target.value) : null})}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent" />
-                  </div>
-                  <p className="text-xs text-gray-400 mt-1">Integracao com Google Maps sera adicionada em breve</p>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    <MapPin className="w-4 h-4 inline mr-1" />Localizacao <span className="text-xs text-gray-400">(clique no mapa para marcar)</span>
+                  </label>
+                  {GOOGLE_MAPS_API_KEY ? (
+                    <APIProvider apiKey={GOOGLE_MAPS_API_KEY}>
+                      <div className="rounded-lg overflow-hidden border border-gray-300" style={{ height: 280 }}>
+                        <Map
+                          defaultCenter={form.latitude && form.longitude ? { lat: form.latitude, lng: form.longitude } : DEFAULT_CENTER}
+                          defaultZoom={form.latitude ? 14 : 4}
+                          gestureHandling="greedy"
+                          mapId="cadastro-map"
+                          onClick={(e: any) => {
+                            const lat = e.detail?.latLng?.lat
+                            const lng = e.detail?.latLng?.lng
+                            if (lat != null && lng != null) {
+                              setForm(prev => ({ ...prev, latitude: lat, longitude: lng }))
+                            }
+                          }}
+                        >
+                          {form.latitude && form.longitude && (
+                            <AdvancedMarker position={{ lat: form.latitude, lng: form.longitude }} />
+                          )}
+                        </Map>
+                      </div>
+                    </APIProvider>
+                  ) : (
+                    <div className="grid grid-cols-2 gap-3">
+                      <input type="number" step="any" placeholder="Latitude" value={form.latitude ?? ''}
+                        onChange={e => setForm({...form, latitude: e.target.value ? Number(e.target.value) : null})}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent" />
+                      <input type="number" step="any" placeholder="Longitude" value={form.longitude ?? ''}
+                        onChange={e => setForm({...form, longitude: e.target.value ? Number(e.target.value) : null})}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent" />
+                    </div>
+                  )}
+                  {form.latitude && form.longitude && (
+                    <p className="text-xs text-gray-500 mt-1">Lat: {form.latitude.toFixed(6)}, Lng: {form.longitude.toFixed(6)}</p>
+                  )}
                 </div>
               )}
 
