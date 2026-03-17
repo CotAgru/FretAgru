@@ -42,7 +42,7 @@ const emptyForm = {
   numero_ticket: '', tipo_ticket_id: '', nfe_numero: '', tipo_nf_id: '',
   data_saida_origem: '', data_entrada_destino: '', data_saida_destino: '',
   origem_id: '', destinatario_id: '', produtor_id: '', cnpj_cpf: '',
-  produto_id: '', veiculo_id: '', motorista_id: '', transportadora_id: '', ano_safra_id: '',
+  produto_id: '', veiculo_id: '', placa: '', motorista_id: '', transportadora_id: '', ano_safra_id: '',
   peso_bruto: '', tara: '', peso_liquido: '',
   umidade_perc: '', impureza_perc: '', avariados_perc: '',
   ardidos_perc: '', esverdeados_perc: '', partidos_perc: '',
@@ -199,6 +199,7 @@ export default function Romaneios() {
       origem_id: item.origem_id || '', destinatario_id: item.destinatario_id || '',
       produtor_id: item.produtor_id || '', cnpj_cpf: item.cnpj_cpf || '',
       produto_id: item.produto_id || '', veiculo_id: item.veiculo_id || '',
+      placa: item.placa || '',
       motorista_id: item.motorista_id || '', transportadora_id: item.transportadora_id || '',
       ano_safra_id: item.ano_safra_id || '',
       peso_bruto: fmtKg(item.peso_bruto), tara: fmtKg(item.tara),
@@ -860,6 +861,12 @@ Use 0 para campos numéricos não encontrados e "" para textos. Pesos em KG.`
                     <option value="">Selecione...</option>
                     {veiculosFiltrados.map((v: any) => <option key={v.id} value={v.id}>{v.placa} ({v.tipo_caminhao})</option>)}
                   </select>
+                  {!form.veiculo_id && form.placa && (
+                    <div className="mt-1 flex items-center gap-2 px-2 py-1 bg-amber-50 border border-amber-200 rounded text-xs text-amber-700">
+                      <span className="font-mono font-semibold">{form.placa}</span>
+                      <span className="text-amber-600">(placa não cadastrada)</span>
+                    </div>
+                  )}
                 </div>
                 <div>
                   <label className="block text-xs font-medium text-gray-700 mb-1">Motorista</label>
