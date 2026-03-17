@@ -1,7 +1,7 @@
 import { useEffect, useState, useRef } from 'react'
 import { Plus, Pencil, Trash2, X, Camera, Upload, Loader2, FileText, Sparkles } from 'lucide-react'
 import toast from 'react-hot-toast'
-import { getRomaneios, createRomaneio, updateRomaneio, deleteRomaneio, getOrdens, getOperacoes, getCadastros, getVeiculos, getProdutos, getTiposNf, getTiposTicket, getAnosSafra } from '../services/api'
+import { getRomaneios, createRomaneio, updateRomaneio, deleteRomaneio, getOrdens, getOperacoes, getCadastros, getVeiculos, getProdutos, getTiposNf, getTiposTicket, getAnosSafra, uploadRomaneioImage } from '../services/api'
 
 const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY || ''
 
@@ -70,6 +70,7 @@ export default function Romaneios() {
   const [form, setForm] = useState(emptyForm)
   const [ocrLoading, setOcrLoading] = useState(false)
   const [imagePreview, setImagePreview] = useState<string | null>(null)
+  const [imageError, setImageError] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const cameraInputRef = useRef<HTMLInputElement>(null)
 
@@ -91,7 +92,7 @@ export default function Romaneios() {
   const transportadorasList = cadastros.filter((c: any) => (c.tipos || []).includes('Transportadora'))
   const origensList = cadastros.filter((c: any) => (c.tipos || []).some((t: string) => ['Fazenda','Armazem','Industria','Porto','Fornecedor'].includes(t)))
 
-  const openNew = () => { setEditing(null); setForm(emptyForm); setImagePreview(null); setShowForm(true) }
+  const openNew = () => { setEditing(null); setForm(emptyForm); setImagePreview(null); setImageError(false); setShowForm(true) }
   const openEdit = (item: any) => {
     setEditing(item)
     setForm({
@@ -120,6 +121,7 @@ export default function Romaneios() {
       transgenia: item.transgenia || '', observacoes: item.observacoes || '', ativo: item.ativo,
     })
     setImagePreview(item.imagem_url || null)
+    setImageError(false)
     setShowForm(true)
   }
 
@@ -226,6 +228,7 @@ export default function Romaneios() {
     reader.onload = async (e) => {
       const base64 = (e.target?.result as string)
       setImagePreview(base64)
+      setImageError(false)
       if (GEMINI_API_KEY) { await processOCR(base64) }
       else { toast('Defina VITE_GEMINI_API_KEY para OCR automático', { icon: 'ℹ️' }) }
     }
@@ -306,8 +309,17 @@ Use 0 para campos numéricos não encontrados e "" para textos. Pesos em KG.`
       else if (v === '' || v === undefined) { payload[k] = null }
       else { payload[k] = v }
     })
-    if (imagePreview && imagePreview.startsWith('data:')) payload.imagem_url = imagePreview
     try {
+      // Upload imagem via Supabase Storage (se for base64 nova)
+      if (imagePreview && imagePreview.startsWith('data:')) {
+        try {
+          const publicUrl = await uploadRomaneioImage(imagePreview, editing?.id)
+          payload.imagem_url = publicUrl
+        } catch (uploadErr: any) {
+          console.error('Erro upload imagem:', uploadErr)
+          toast.error('Erro ao enviar imagem. Salvando sem imagem.')
+        }
+      }
       if (editing) { await updateRomaneio(editing.id, payload); toast.success('Romaneio atualizado') }
       else { await createRomaneio(payload); toast.success('Romaneio cadastrado') }
       setShowForm(false); load()
@@ -440,7 +452,16 @@ Use 0 para campos numéricos não encontrados e "" para textos. Pesos em KG.`
                 {ocrLoading && <p className="text-sm text-purple-600 mt-2">Analisando imagem com Gemini AI...</p>}
                 {imagePreview && (
                   <div className="mt-3">
-                    <img src={imagePreview} alt="Romaneio" className="max-h-48 rounded-lg border shadow-sm object-contain" />
+                    {imageError ? (
+                      <div className="flex items-center gap-2 px-4 py-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-600">
+                        <FileText className="w-5 h-5" />
+                        <span>Imagem indisponível. Anexe novamente para atualizar.</span>
+                      </div>
+                    ) : (
+                      <img src={imagePreview} alt="Romaneio"
+                        onError={() => setImageError(true)}
+                        className="max-h-48 rounded-lg border shadow-sm object-contain" />
+                    )}
                   </div>
                 )}
               </div>

@@ -235,3 +235,27 @@ export const updateRomaneio = async (id: string, data: any) =>
 
 export const deleteRomaneio = async (id: string) =>
   throwIfError(await supabase.from('romaneios').delete().eq('id', id))
+
+// === UPLOAD IMAGEM ROMANEIO (Supabase Storage) ===
+export const uploadRomaneioImage = async (base64DataUrl: string, romaneioId?: string): Promise<string> => {
+  const match = base64DataUrl.match(/^data:(image\/\w+);base64,(.+)$/)
+  if (!match) throw new Error('Formato de imagem inválido')
+  const mimeType = match[1]
+  const ext = mimeType.split('/')[1] || 'jpeg'
+  const byteString = atob(match[2])
+  const ab = new ArrayBuffer(byteString.length)
+  const ia = new Uint8Array(ab)
+  for (let i = 0; i < byteString.length; i++) ia[i] = byteString.charCodeAt(i)
+  const blob = new Blob([ab], { type: mimeType })
+
+  const fileName = `${romaneioId || crypto.randomUUID()}_${Date.now()}.${ext}`
+  const { error } = await supabase.storage
+    .from('romaneios-img')
+    .upload(fileName, blob, { contentType: mimeType, upsert: true })
+  if (error) throw error
+
+  const { data: urlData } = supabase.storage
+    .from('romaneios-img')
+    .getPublicUrl(fileName)
+  return urlData.publicUrl
+}
