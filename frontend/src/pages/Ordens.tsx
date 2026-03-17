@@ -2,6 +2,7 @@ import { useEffect, useState, useCallback } from 'react'
 import { Plus, Pencil, Trash2, X, Truck, User, Minus, Check, CarFront, Loader2, Filter, ChevronDown } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { getOrdens, createOrdem, updateOrdem, deleteOrdem, getCadastros, getProdutos, getVeiculos, getPrecos, getOrdemTransportadores, addOrdemTransportador, removeOrdemTransportador, getOperacoes, createCadastro, createProduto, createPreco } from '../services/api'
+import ViewModal, { Field } from '../components/ViewModal'
 
 const STATUS_OPTIONS = [
   { value: 'pendente', label: 'Pendente', color: 'bg-yellow-100 text-yellow-700' },
@@ -58,6 +59,7 @@ export default function Ordens() {
   const [searchTerm, setSearchTerm] = useState('')
   const [activeFilters, setActiveFilters] = useState<{id: string, field: string, value: string}[]>([])
   const [showFilterOptions, setShowFilterOptions] = useState(false)
+  const [viewingItem, setViewingItem] = useState<any>(null)
 
   // Transportadores vinculados a ordem (junction table)
   const [ordemTransps, setOrdemTransps] = useState<any[]>([])
@@ -527,7 +529,7 @@ export default function Ordens() {
               {filteredItems.map((item: any) => {
                 const st = statusInfo(item.status)
                 return (
-                  <tr key={item.id} className="hover:bg-gray-50">
+                  <tr key={item.id} className="hover:bg-gray-50 cursor-pointer" onClick={() => setViewingItem(item)}>
                     <td className="px-4 py-3 font-mono text-xs text-blue-600 font-semibold">{item.numero_ordem_fmt || item.numero_ordem}</td>
                     <td className="px-4 py-3 text-xs text-gray-500">{item.operacao_nome || '-'}</td>
                     <td className="px-4 py-3 font-medium">{item.nome_ordem || '-'}</td>
@@ -535,7 +537,7 @@ export default function Ordens() {
                     <td className="px-4 py-3">{item.origem_nome}</td>
                     <td className="px-4 py-3">{item.destino_nome}</td>
                     <td className="px-4 py-3">{item.produto_nome}</td>
-                    <td className="px-4 py-3 text-right space-x-1">
+                    <td className="px-4 py-3 text-right space-x-1" onClick={e => e.stopPropagation()}>
                       <button onClick={() => openEdit(item)} className="p-1.5 text-blue-600 hover:bg-blue-50 rounded"><Pencil className="w-4 h-4" /></button>
                       <button onClick={() => remove(item.id)} className="p-1.5 text-red-600 hover:bg-red-50 rounded"><Trash2 className="w-4 h-4" /></button>
                     </td>
@@ -990,6 +992,30 @@ export default function Ordens() {
           </div>
         </div>
       )}
+
+      {/* Modal de Visualização */}
+      <ViewModal
+        title="Detalhes da Ordem de Carregamento"
+        isOpen={!!viewingItem}
+        onClose={() => setViewingItem(null)}
+        onEdit={() => { openEdit(viewingItem); setViewingItem(null) }}
+      >
+        {viewingItem && (
+          <dl className="grid grid-cols-2 gap-x-6 gap-y-4">
+            <Field label="Número da Ordem" value={viewingItem.numero_ordem_fmt || viewingItem.numero_ordem} />
+            <Field label="Nome da Ordem" value={viewingItem.nome_ordem} />
+            <Field label="Status" value={statusInfo(viewingItem.status).label} />
+            <Field label="Operação" value={viewingItem.operacao_nome || '-'} />
+            <Field label="Origem" value={viewingItem.origem_nome} />
+            <Field label="Destino" value={viewingItem.destino_nome} />
+            <Field label="Produto" value={viewingItem.produto_nome} />
+            <Field label="Quantidade Prevista" value={viewingItem.quantidade_prevista ? `${viewingItem.quantidade_prevista} ${viewingItem.unidade}` : '-'} />
+            <Field label="Preço Vinculado" value={viewingItem.preco_id ? 'Sim' : 'Não'} />
+            <Field label="Criado em" value={new Date(viewingItem.created_at).toLocaleString('pt-BR')} />
+            <Field label="Observações" value={viewingItem.observacoes} full />
+          </dl>
+        )}
+      </ViewModal>
     </div>
   )
 }

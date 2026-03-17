@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Plus, Pencil, Trash2, X, FolderOpen } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { getOperacoes, createOperacao, updateOperacao, deleteOperacao, getAnosSafra } from '../services/api'
+import ViewModal, { Field } from '../components/ViewModal'
 
 const STATUS_OPS = [
   { value: 'ativa', label: 'Ativa', color: 'bg-green-100 text-green-700' },
@@ -20,6 +21,7 @@ export default function Operacoes() {
   const [showForm, setShowForm] = useState(false)
   const [editing, setEditing] = useState<any>(null)
   const [form, setForm] = useState(emptyForm)
+  const [viewingItem, setViewingItem] = useState<any>(null)
 
   const load = () => {
     setLoading(true)
@@ -82,7 +84,7 @@ export default function Operacoes() {
           {items.map((item: any) => {
             const st = statusInfo(item.status)
             return (
-              <div key={item.id} className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 hover:shadow-md transition-shadow">
+              <div key={item.id} className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 hover:shadow-md transition-shadow cursor-pointer" onClick={() => setViewingItem(item)}>
                 <div className="flex items-start justify-between mb-2">
                   <h3 className="font-semibold text-gray-800 text-base">{item.nome}</h3>
                   <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${st.color}`}>{st.label}</span>
@@ -94,7 +96,7 @@ export default function Operacoes() {
                   {item.data_fim && <span>Fim: {item.data_fim}</span>}
                   {!item.data_inicio && !item.data_fim && <span>Criado em {new Date(item.created_at).toLocaleDateString('pt-BR')}</span>}
                 </div>
-                <div className="flex justify-end gap-1 border-t pt-2">
+                <div className="flex justify-end gap-1 border-t pt-2" onClick={e => e.stopPropagation()}>
                   <button onClick={() => openEdit(item)} className="p-1.5 text-blue-600 hover:bg-blue-50 rounded"><Pencil className="w-4 h-4" /></button>
                   <button onClick={() => remove(item.id)} className="p-1.5 text-red-600 hover:bg-red-50 rounded"><Trash2 className="w-4 h-4" /></button>
                 </div>
@@ -167,6 +169,26 @@ export default function Operacoes() {
           </div>
         </div>
       )}
+
+      {/* Modal de Visualização */}
+      <ViewModal
+        title="Detalhes da Operação"
+        isOpen={!!viewingItem}
+        onClose={() => setViewingItem(null)}
+        onEdit={() => { openEdit(viewingItem); setViewingItem(null) }}
+      >
+        {viewingItem && (
+          <dl className="grid grid-cols-2 gap-x-6 gap-y-4">
+            <Field label="Nome" value={viewingItem.nome} />
+            <Field label="Status" value={statusInfo(viewingItem.status).label} />
+            <Field label="Ano Safra" value={viewingItem.ano_safra_nome || '-'} />
+            <Field label="Data Início" value={viewingItem.data_inicio || '-'} />
+            <Field label="Data Fim" value={viewingItem.data_fim || '-'} />
+            <Field label="Criado em" value={new Date(viewingItem.created_at).toLocaleString('pt-BR')} />
+            <Field label="Descrição" value={viewingItem.descricao} full />
+          </dl>
+        )}
+      </ViewModal>
     </div>
   )
 }
