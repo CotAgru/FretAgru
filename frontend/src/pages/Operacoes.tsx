@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react'
-import { Plus, Pencil, Trash2, X, FolderOpen } from 'lucide-react'
+import { Plus, Pencil, Trash2, X, FolderOpen, FileText, Calendar } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { getOperacoes, createOperacao, updateOperacao, deleteOperacao, getAnosSafra } from '../services/api'
-import ViewModal, { Field } from '../components/ViewModal'
+import ViewModal, { Field, Section } from '../components/ViewModal'
 
 const STATUS_OPS = [
   { value: 'ativa', label: 'Ativa', color: 'bg-green-100 text-green-700' },
@@ -178,15 +178,25 @@ export default function Operacoes() {
         onEdit={() => { openEdit(viewingItem); setViewingItem(null) }}
       >
         {viewingItem && (
-          <dl className="grid grid-cols-2 gap-x-6 gap-y-4">
-            <Field label="Nome" value={viewingItem.nome} />
-            <Field label="Status" value={statusInfo(viewingItem.status).label} />
-            <Field label="Ano Safra" value={viewingItem.ano_safra_nome || '-'} />
-            <Field label="Data Início" value={viewingItem.data_inicio || '-'} />
-            <Field label="Data Fim" value={viewingItem.data_fim || '-'} />
-            <Field label="Criado em" value={new Date(viewingItem.created_at).toLocaleString('pt-BR')} />
-            <Field label="Descrição" value={viewingItem.descricao} full />
-          </dl>
+          <>
+            <Section title="Identificação" icon={<FileText className="w-5 h-5" />}>
+              <Field label="Nome" value={viewingItem.nome} highlight />
+              <Field label="Status" value={statusInfo(viewingItem.status).label} highlight />
+              <Field label="Ano Safra" value={viewingItem.ano_safra_nome || '-'} />
+              <Field label="Criado em" value={new Date(viewingItem.created_at).toLocaleString('pt-BR')} />
+            </Section>
+
+            <Section title="Período" icon={<Calendar className="w-5 h-5" />}>
+              <Field label="Data Início" value={viewingItem.data_inicio || '-'} />
+              <Field label="Data Fim" value={viewingItem.data_fim || '-'} />
+            </Section>
+
+            {viewingItem.descricao && (
+              <Section title="Descrição" icon={<FolderOpen className="w-5 h-5" />}>
+                <Field label="Descrição" value={viewingItem.descricao} full />
+              </Section>
+            )}
+          </>
         )}
       </ViewModal>
     </div>

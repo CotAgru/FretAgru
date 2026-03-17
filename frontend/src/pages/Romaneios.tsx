@@ -1,8 +1,8 @@
 import { useEffect, useState, useRef } from 'react'
-import { Plus, Pencil, Trash2, X, Camera, Upload, Loader2, FileText, Sparkles, Settings, ZoomIn, Filter, ChevronDown } from 'lucide-react'
+import { Plus, Pencil, Trash2, X, Camera, Upload, Loader2, FileText, Sparkles, Settings, ZoomIn, Filter, ChevronDown, ExternalLink, Package, Truck, Scale, Target } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { getRomaneios, createRomaneio, updateRomaneio, deleteRomaneio, getOrdens, getOperacoes, getCadastros, getVeiculos, getProdutos, getTiposNf, getTiposTicket, getAnosSafra, uploadRomaneioImage } from '../services/api'
-import ViewModal, { Field } from '../components/ViewModal'
+import ViewModal, { Field, Section } from '../components/ViewModal'
 
 const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY || ''
 
@@ -743,12 +743,12 @@ Use 0 para campos numéricos não encontrados e "" para textos. Pesos em KG.`
                         <span>Imagem indisponível. Anexe novamente para atualizar.</span>
                       </div>
                     ) : (
-                      <div className="relative group cursor-pointer" onClick={() => setLightboxImage(imagePreview)}>
+                      <div className="relative group cursor-pointer" onClick={() => window.open(imagePreview, '_blank')}>
                         <img src={imagePreview} alt="Romaneio"
                           onError={() => setImageError(true)}
                           className="max-h-48 rounded-lg border shadow-sm object-contain" />
                         <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-all flex items-center justify-center rounded-lg">
-                          <ZoomIn className="w-8 h-8 text-white opacity-0 group-hover:opacity-100 transition-opacity" />
+                          <ExternalLink className="w-8 h-8 text-white opacity-0 group-hover:opacity-100 transition-opacity" />
                         </div>
                       </div>
                     )}
@@ -998,36 +998,52 @@ Use 0 para campos numéricos não encontrados e "" para textos. Pesos em KG.`
         onEdit={() => { openEdit(viewingItem); setViewingItem(null) }}
       >
         {viewingItem && (
-          <dl className="grid grid-cols-2 gap-x-6 gap-y-4">
-            <Field label="Operação" value={operacoes.find(o => o.id === viewingItem.operacao_id)?.nome} />
-            <Field label="Ordem Carregamento" value={viewingItem.ordem_nome} />
-            <Field label="Ticket" value={viewingItem.numero_ticket} />
-            <Field label="Tipo Ticket" value={tiposTicket.find(t => t.id === viewingItem.tipo_ticket_id)?.nome} />
-            <Field label="NF-e" value={viewingItem.nfe_numero} />
-            <Field label="Tipo NF" value={tiposNf.find(t => t.id === viewingItem.tipo_nf_id)?.nome} />
-            <Field label="Data Saída Origem" value={viewingItem.data_saida_origem} />
-            <Field label="Data Entrada Destino" value={viewingItem.data_entrada_destino} />
-            <Field label="Origem" value={viewingItem.origem_id ? cadNome(viewingItem.origem_id) : '-'} />
-            <Field label="Destino" value={viewingItem.destinatario_id ? cadNome(viewingItem.destinatario_id) : '-'} />
-            <Field label="Produtor" value={viewingItem.produtor_id ? cadNome(viewingItem.produtor_id) : viewingItem.produtor} />
-            <Field label="CNPJ/CPF" value={viewingItem.cnpj_cpf} />
-            <Field label="Produto" value={viewingItem.produto_id ? prodNome(viewingItem.produto_id) : viewingItem.produto} />
-            <Field label="Ano Safra" value={anosSafra.find(a => a.id === viewingItem.ano_safra_id)?.nome} />
-            <Field label="Placa" value={viewingItem.veiculo_id ? veicPlaca(viewingItem.veiculo_id) : viewingItem.placa} />
-            <Field label="Motorista" value={viewingItem.motorista_id ? cadNome(viewingItem.motorista_id) : '-'} />
-            <Field label="Transportadora" value={viewingItem.transportadora_id ? cadNome(viewingItem.transportadora_id) : '-'} />
-            <Field label="Transgenia" value={viewingItem.transgenia} />
-            <Field label="Peso Bruto (kg)" value={viewingItem.peso_bruto ? fmtNum(viewingItem.peso_bruto) : '-'} />
-            <Field label="Tara (kg)" value={viewingItem.tara ? fmtNum(viewingItem.tara) : '-'} />
-            <Field label="Peso Líquido (kg)" value={viewingItem.peso_liquido ? fmtNum(viewingItem.peso_liquido) : '-'} />
-            <Field label="Peso Corrigido (kg)" value={viewingItem.peso_corrigido ? fmtNum(viewingItem.peso_corrigido) : '-'} />
-            <Field label="Umidade %" value={viewingItem.umidade_perc ? fmtPerc(viewingItem.umidade_perc) : '-'} />
-            <Field label="Impureza %" value={viewingItem.impureza_perc ? fmtPerc(viewingItem.impureza_perc) : '-'} />
-            <Field label="Avariados %" value={viewingItem.avariados_perc ? fmtPerc(viewingItem.avariados_perc) : '-'} />
-            <Field label="Ardidos %" value={viewingItem.ardidos_perc ? fmtPerc(viewingItem.ardidos_perc) : '-'} />
-            <Field label="Desc. Total (kg)" value={viewingItem.desconto_kg ? fmtNum(viewingItem.desconto_kg) : '-'} />
-            <Field label="Observações" value={viewingItem.observacoes} full />
-          </dl>
+          <>
+            <Section title="Operação e Documentação" icon={<FileText className="w-5 h-5" />}>
+              <Field label="Operação" value={operacoes.find(o => o.id === viewingItem.operacao_id)?.nome} highlight />
+              <Field label="Ordem Carregamento" value={viewingItem.ordem_nome} highlight />
+              <Field label="Ticket" value={viewingItem.numero_ticket} />
+              <Field label="Tipo Ticket" value={tiposTicket.find(t => t.id === viewingItem.tipo_ticket_id)?.nome} />
+              <Field label="NF-e" value={viewingItem.nfe_numero} />
+              <Field label="Tipo NF" value={tiposNf.find(t => t.id === viewingItem.tipo_nf_id)?.nome} />
+              <Field label="Data Saída Origem" value={viewingItem.data_saida_origem} />
+              <Field label="Data Entrada Destino" value={viewingItem.data_entrada_destino} />
+            </Section>
+
+            <Section title="Origem, Destino e Produto" icon={<Target className="w-5 h-5" />}>
+              <Field label="Origem" value={viewingItem.origem_id ? cadNome(viewingItem.origem_id) : '-'} />
+              <Field label="Destino" value={viewingItem.destinatario_id ? cadNome(viewingItem.destinatario_id) : '-'} />
+              <Field label="Produtor" value={viewingItem.produtor_id ? cadNome(viewingItem.produtor_id) : viewingItem.produtor} />
+              <Field label="CNPJ/CPF" value={viewingItem.cnpj_cpf} />
+              <Field label="Produto" value={viewingItem.produto_id ? prodNome(viewingItem.produto_id) : viewingItem.produto} />
+              <Field label="Ano Safra" value={anosSafra.find(a => a.id === viewingItem.ano_safra_id)?.nome} />
+            </Section>
+
+            <Section title="Transporte" icon={<Truck className="w-5 h-5" />}>
+              <Field label="Placa" value={viewingItem.veiculo_id ? veicPlaca(viewingItem.veiculo_id) : viewingItem.placa} />
+              <Field label="Motorista" value={viewingItem.motorista_id ? cadNome(viewingItem.motorista_id) : '-'} />
+              <Field label="Transportadora" value={viewingItem.transportadora_id ? cadNome(viewingItem.transportadora_id) : '-'} />
+              <Field label="Transgenia" value={viewingItem.transgenia} />
+            </Section>
+
+            <Section title="Pesagem e Qualidade" icon={<Scale className="w-5 h-5" />}>
+              <Field label="Peso Bruto (kg)" value={viewingItem.peso_bruto ? fmtNum(viewingItem.peso_bruto) : '-'} />
+              <Field label="Tara (kg)" value={viewingItem.tara ? fmtNum(viewingItem.tara) : '-'} />
+              <Field label="Peso Líquido (kg)" value={viewingItem.peso_liquido ? fmtNum(viewingItem.peso_liquido) : '-'} highlight />
+              <Field label="Peso Corrigido (kg)" value={viewingItem.peso_corrigido ? fmtNum(viewingItem.peso_corrigido) : '-'} highlight />
+              <Field label="Umidade %" value={viewingItem.umidade_perc ? fmtPerc(viewingItem.umidade_perc) : '-'} />
+              <Field label="Impureza %" value={viewingItem.impureza_perc ? fmtPerc(viewingItem.impureza_perc) : '-'} />
+              <Field label="Avariados %" value={viewingItem.avariados_perc ? fmtPerc(viewingItem.avariados_perc) : '-'} />
+              <Field label="Ardidos %" value={viewingItem.ardidos_perc ? fmtPerc(viewingItem.ardidos_perc) : '-'} />
+              <Field label="Desc. Total (kg)" value={viewingItem.desconto_kg ? fmtNum(viewingItem.desconto_kg) : '-'} />
+            </Section>
+
+            {viewingItem.observacoes && (
+              <Section title="Observações" icon={<Package className="w-5 h-5" />}>
+                <Field label="Observações" value={viewingItem.observacoes} full />
+              </Section>
+            )}
+          </>
         )}
       </ViewModal>
 

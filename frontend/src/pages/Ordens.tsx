@@ -1,8 +1,8 @@
 import { useEffect, useState, useCallback } from 'react'
-import { Plus, Pencil, Trash2, X, Truck, User, Minus, Check, CarFront, Loader2, Filter, ChevronDown } from 'lucide-react'
+import { Plus, Pencil, Trash2, X, Truck, User, Minus, Check, CarFront, Loader2, Filter, ChevronDown, Package, Target, FileText } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { getOrdens, createOrdem, updateOrdem, deleteOrdem, getCadastros, getProdutos, getVeiculos, getPrecos, getOrdemTransportadores, addOrdemTransportador, removeOrdemTransportador, getOperacoes, createCadastro, createProduto, createPreco } from '../services/api'
-import ViewModal, { Field } from '../components/ViewModal'
+import ViewModal, { Field, Section } from '../components/ViewModal'
 
 const STATUS_OPTIONS = [
   { value: 'pendente', label: 'Pendente', color: 'bg-yellow-100 text-yellow-700' },
@@ -1001,19 +1001,29 @@ export default function Ordens() {
         onEdit={() => { openEdit(viewingItem); setViewingItem(null) }}
       >
         {viewingItem && (
-          <dl className="grid grid-cols-2 gap-x-6 gap-y-4">
-            <Field label="Número da Ordem" value={viewingItem.numero_ordem_fmt || viewingItem.numero_ordem} />
-            <Field label="Nome da Ordem" value={viewingItem.nome_ordem} />
-            <Field label="Status" value={statusInfo(viewingItem.status).label} />
-            <Field label="Operação" value={viewingItem.operacao_nome || '-'} />
-            <Field label="Origem" value={viewingItem.origem_nome} />
-            <Field label="Destino" value={viewingItem.destino_nome} />
-            <Field label="Produto" value={viewingItem.produto_nome} />
-            <Field label="Quantidade Prevista" value={viewingItem.quantidade_prevista ? `${viewingItem.quantidade_prevista} ${viewingItem.unidade}` : '-'} />
-            <Field label="Preço Vinculado" value={viewingItem.preco_id ? 'Sim' : 'Não'} />
-            <Field label="Criado em" value={new Date(viewingItem.created_at).toLocaleString('pt-BR')} />
-            <Field label="Observações" value={viewingItem.observacoes} full />
-          </dl>
+          <>
+            <Section title="Identificação" icon={<FileText className="w-5 h-5" />}>
+              <Field label="Número da Ordem" value={viewingItem.numero_ordem_fmt || viewingItem.numero_ordem} highlight />
+              <Field label="Nome da Ordem" value={viewingItem.nome_ordem} highlight />
+              <Field label="Status" value={statusInfo(viewingItem.status).label} />
+              <Field label="Operação" value={viewingItem.operacao_nome || '-'} />
+              <Field label="Criado em" value={new Date(viewingItem.created_at).toLocaleString('pt-BR')} />
+            </Section>
+
+            <Section title="Origem, Destino e Produto" icon={<Target className="w-5 h-5" />}>
+              <Field label="Origem" value={viewingItem.origem_nome} />
+              <Field label="Destino" value={viewingItem.destino_nome} />
+              <Field label="Produto" value={viewingItem.produto_nome} />
+              <Field label="Quantidade Prevista" value={viewingItem.quantidade_prevista ? `${viewingItem.quantidade_prevista} ${viewingItem.unidade}` : '-'} highlight />
+              <Field label="Preço Vinculado" value={viewingItem.preco_id ? 'Sim' : 'Não'} />
+            </Section>
+
+            {viewingItem.observacoes && (
+              <Section title="Observações" icon={<Package className="w-5 h-5" />}>
+                <Field label="Observações" value={viewingItem.observacoes} full />
+              </Section>
+            )}
+          </>
         )}
       </ViewModal>
     </div>
