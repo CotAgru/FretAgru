@@ -70,8 +70,8 @@ GROUP BY TRIM(r.fornecedor_destinatario) ORDER BY destino_texto;
 -- =====================================================================
 -- PASSO 2: Criar cadastro genérico para veículos sem proprietário
 -- =====================================================================
-INSERT INTO cadastros (nome, nome_fantasia, tipos, ativo)
-SELECT 'Proprietário Não Identificado', 'Prop. Desconhecido', ARRAY['Motorista']::TEXT[], true
+INSERT INTO cadastros (nome, nome_fantasia, uf, cidade, tipos, ativo)
+SELECT 'Proprietário Não Identificado', 'Prop. Desconhecido', 'GO', 'Não Informada', ARRAY['Motorista']::TEXT[], true
 WHERE NOT EXISTS (SELECT 1 FROM cadastros WHERE nome = 'Proprietário Não Identificado');
 
 -- =====================================================================
