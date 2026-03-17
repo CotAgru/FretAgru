@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Plus, Pencil, Trash2, X, Filter } from 'lucide-react'
+import { Plus, Pencil, Trash2, X, Filter, ChevronDown } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { getProdutos, createProduto, updateProduto, deleteProduto } from '../services/api'
 
@@ -14,6 +14,8 @@ export default function Produtos() {
   const [editing, setEditing] = useState<any>(null)
   const [form, setForm] = useState(emptyForm)
   const [searchTerm, setSearchTerm] = useState('')
+  const [activeFilters, setActiveFilters] = useState<{id: string, field: string, value: string}[]>([])
+  const [showFilterOptions, setShowFilterOptions] = useState(false)
 
   const load = () => { setLoading(true); getProdutos().then(setItems).catch(() => toast.error('Erro ao carregar')).finally(() => setLoading(false)) }
   useEffect(() => { load() }, [])
@@ -40,14 +42,49 @@ export default function Produtos() {
     catch { toast.error('Erro ao remover') }
   }
 
+  const FILTER_FIELDS = [
+    { key: 'tipo', label: 'Tipo', type: 'select', options: () => TIPOS.map(t => ({ value: t, label: t })) },
+    { key: 'unidade', label: 'Unidade de Medida', type: 'select', options: () => UNIDADES.map(u => ({ value: u, label: u })) },
+    { key: 'nome', label: 'Nome do Produto', type: 'text' },
+  ]
+
+  const addFilter = (field: string) => {
+    setActiveFilters([...activeFilters, { id: Date.now().toString(), field, value: '' }])
+    setShowFilterOptions(false)
+  }
+
+  const updateFilterValue = (id: string, value: string) => {
+    setActiveFilters(activeFilters.map(f => f.id === id ? { ...f, value } : f))
+  }
+
+  const removeFilter = (id: string) => {
+    setActiveFilters(activeFilters.filter(f => f.id !== id))
+  }
+
+  const clearAllFilters = () => {
+    setActiveFilters([])
+    setSearchTerm('')
+  }
+
   const filteredItems = items.filter(item => {
-    if (!searchTerm) return true
-    const term = searchTerm.toLowerCase()
-    return (
-      (item.nome || '').toLowerCase().includes(term) ||
-      (item.tipo || '').toLowerCase().includes(term) ||
-      (item.unidade_medida || '').toLowerCase().includes(term)
-    )
+    if (searchTerm) {
+      const term = searchTerm.toLowerCase()
+      const matchesSearch = (
+        (item.nome || '').toLowerCase().includes(term) ||
+        (item.tipo || '').toLowerCase().includes(term) ||
+        (item.unidade_medida || '').toLowerCase().includes(term)
+      )
+      if (!matchesSearch) return false
+    }
+    for (const filter of activeFilters) {
+      if (!filter.value) continue
+      switch (filter.field) {
+        case 'tipo': if (item.tipo !== filter.value) return false; break
+        case 'unidade': if (item.unidade_medida !== filter.value) return false; break
+        case 'nome': if (!(item.nome || '').toLowerCase().includes(filter.value.toLowerCase())) return false; break
+      }
+    }
+    return true
   })
 
   return (
@@ -57,12 +94,58 @@ export default function Produtos() {
         <button onClick={openNew} className="flex items-center gap-2 bg-green-600 text-white px-3 py-2 sm:px-4 rounded-lg hover:bg-green-700 text-sm sm:text-base whitespace-nowrap"><Plus className="w-4 h-4" /> <span className="hidden sm:inline">Novo</span> Produto</button>
       </div>
 
-      <div className="mb-4">
-        <div className="relative">
+      <div className="mb-4 space-y-3">
+        <div className="relative flex-1">
           <input type="text" placeholder="Buscar por nome, tipo, unidade..."
             value={searchTerm} onChange={e => setSearchTerm(e.target.value)}
             className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent" />
           <Filter className="w-5 h-5 text-gray-400 absolute left-3 top-2.5" />
+        </div>
+        {activeFilters.length > 0 && (
+          <div className="flex flex-wrap gap-2 items-center">
+            {activeFilters.map((filter) => {
+              const fieldDef = FILTER_FIELDS.find(f => f.key === filter.field)
+              if (!fieldDef) return null
+              return (
+                <div key={filter.id} className="flex items-center gap-2 bg-gray-100 rounded-lg p-2 pr-3">
+                  <span className="text-xs font-medium text-gray-600">{fieldDef.label}:</span>
+                  {fieldDef.type === 'select' ? (
+                    <select value={filter.value} onChange={e => updateFilterValue(filter.id, e.target.value)}
+                      className="text-sm border-0 bg-transparent focus:ring-0 p-0 pr-6">
+                      <option value="">Selecione...</option>
+                      {fieldDef.options && fieldDef.options().map((opt: any) => (
+                        <option key={opt.value} value={opt.value}>{opt.label}</option>
+                      ))}
+                    </select>
+                  ) : (
+                    <input type="text" value={filter.value} onChange={e => updateFilterValue(filter.id, e.target.value)}
+                      placeholder="Digite..." className="text-sm border-0 bg-transparent focus:ring-0 p-0 w-32" />
+                  )}
+                  <button onClick={() => removeFilter(filter.id)} className="p-1 hover:bg-gray-200 rounded">
+                    <X className="w-3 h-3 text-gray-500" />
+                  </button>
+                </div>
+              )
+            })}
+            <button onClick={clearAllFilters} className="text-xs text-red-600 hover:text-red-700 font-medium px-2">Limpar todos</button>
+          </div>
+        )}
+        <div className="relative">
+          <button onClick={() => setShowFilterOptions(!showFilterOptions)}
+            className="flex items-center gap-2 px-3 py-2 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 text-sm">
+            <Plus className="w-4 h-4" /> Adicionar Filtro <ChevronDown className="w-4 h-4" />
+          </button>
+          {showFilterOptions && (
+            <div className="absolute top-full mt-1 left-0 bg-white border border-gray-200 rounded-lg shadow-lg z-10 max-h-64 overflow-y-auto w-64">
+              {FILTER_FIELDS.filter(f => !activeFilters.find(af => af.field === f.key)).map(field => (
+                <button key={field.key} onClick={() => addFilter(field.key)}
+                  className="w-full text-left px-4 py-2 hover:bg-gray-50 text-sm">{field.label}</button>
+              ))}
+              {FILTER_FIELDS.filter(f => !activeFilters.find(af => af.field === f.key)).length === 0 && (
+                <div className="px-4 py-3 text-sm text-gray-500 text-center">Todos os filtros já foram adicionados</div>
+              )}
+            </div>
+          )}
         </div>
       </div>
 

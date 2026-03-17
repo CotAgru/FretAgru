@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef } from 'react'
-import { Plus, Pencil, Trash2, X, TrendingUp, TrendingDown, Filter, FileDown, Loader2 } from 'lucide-react'
+import { Plus, Pencil, Trash2, X, TrendingUp, TrendingDown, Filter, FileDown, Loader2, ChevronDown } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { getPrecos, createPreco, updatePreco, deletePreco, getCadastros, getProdutos } from '../services/api'
 
@@ -20,6 +20,8 @@ export default function Precos() {
   const [editing, setEditing] = useState<any>(null)
   const [form, setForm] = useState(emptyForm)
   const [searchTerm, setSearchTerm] = useState('')
+  const [activeFilters, setActiveFilters] = useState<{id: string, field: string, value: string}[]>([])
+  const [showFilterOptions, setShowFilterOptions] = useState(false)
   const [calcDist, setCalcDist] = useState(false)
 
   const load = () => {
@@ -141,6 +143,32 @@ export default function Precos() {
   const fmtCur = (v: number) => v?.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
 
   // Gerar documento de detalhamento do preco
+  const FILTER_FIELDS = [
+    { key: 'origem', label: 'Origem', type: 'select', options: () => origemDestino.map((o: any) => ({ value: o.id, label: o.nome_fantasia || o.nome })) },
+    { key: 'destino', label: 'Destino', type: 'select', options: () => origemDestino.map((o: any) => ({ value: o.id, label: o.nome_fantasia || o.nome })) },
+    { key: 'produto', label: 'Produto', type: 'select', options: () => produtos.map((p: any) => ({ value: p.id, label: p.nome })) },
+    { key: 'fornecedor', label: 'Transportador', type: 'select', options: () => transportadores.map((t: any) => ({ value: t.id, label: t.nome_fantasia || t.nome })) },
+    { key: 'unidade', label: 'Unidade de Pre\u00e7o', type: 'select', options: () => UNIDADES_PRECO.map(u => ({ value: u, label: u })) },
+  ]
+
+  const addFilter = (field: string) => {
+    setActiveFilters([...activeFilters, { id: Date.now().toString(), field, value: '' }])
+    setShowFilterOptions(false)
+  }
+
+  const updateFilterValue = (id: string, value: string) => {
+    setActiveFilters(activeFilters.map(f => f.id === id ? { ...f, value } : f))
+  }
+
+  const removeFilter = (id: string) => {
+    setActiveFilters(activeFilters.filter(f => f.id !== id))
+  }
+
+  const clearAllFilters = () => {
+    setActiveFilters([])
+    setSearchTerm('')
+  }
+
   const gerarDocumento = (item: any) => {
     const origem = allCadastros.find((c: any) => c.id === item.origem_id)
     const destino = allCadastros.find((c: any) => c.id === item.destino_id)
@@ -238,15 +266,28 @@ export default function Precos() {
   }
 
   const filteredItems = items.filter(item => {
-    if (!searchTerm) return true
-    const term = searchTerm.toLowerCase()
-    return (
-      (item.origem_nome || '').toLowerCase().includes(term) ||
-      (item.destino_nome || '').toLowerCase().includes(term) ||
-      (item.produto_nome || '').toLowerCase().includes(term) ||
-      (item.fornecedor_nome || '').toLowerCase().includes(term) ||
-      (item.unidade_preco || '').toLowerCase().includes(term)
-    )
+    if (searchTerm) {
+      const term = searchTerm.toLowerCase()
+      const matchesSearch = (
+        (item.origem_nome || '').toLowerCase().includes(term) ||
+        (item.destino_nome || '').toLowerCase().includes(term) ||
+        (item.produto_nome || '').toLowerCase().includes(term) ||
+        (item.fornecedor_nome || '').toLowerCase().includes(term) ||
+        (item.unidade_preco || '').toLowerCase().includes(term)
+      )
+      if (!matchesSearch) return false
+    }
+    for (const filter of activeFilters) {
+      if (!filter.value) continue
+      switch (filter.field) {
+        case 'origem': if (item.origem_id !== filter.value) return false; break
+        case 'destino': if (item.destino_id !== filter.value) return false; break
+        case 'produto': if (item.produto_id !== filter.value) return false; break
+        case 'fornecedor': if (item.fornecedor_id !== filter.value) return false; break
+        case 'unidade': if (item.unidade_preco !== filter.value) return false; break
+      }
+    }
+    return true
   })
 
   return (
@@ -256,12 +297,53 @@ export default function Precos() {
         <button onClick={openNew} className="flex items-center gap-2 bg-green-600 text-white px-3 py-2 sm:px-4 rounded-lg hover:bg-green-700 text-sm sm:text-base whitespace-nowrap"><Plus className="w-4 h-4" /> <span className="hidden sm:inline">Novo</span> Preco</button>
       </div>
 
-      <div className="mb-4">
-        <div className="relative">
+      <div className="mb-4 space-y-3">
+        <div className="relative flex-1">
           <input type="text" placeholder="Buscar por origem, destino, produto, fornecedor..."
             value={searchTerm} onChange={e => setSearchTerm(e.target.value)}
             className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent" />
           <Filter className="w-5 h-5 text-gray-400 absolute left-3 top-2.5" />
+        </div>
+        {activeFilters.length > 0 && (
+          <div className="flex flex-wrap gap-2 items-center">
+            {activeFilters.map((filter) => {
+              const fieldDef = FILTER_FIELDS.find(f => f.key === filter.field)
+              if (!fieldDef) return null
+              return (
+                <div key={filter.id} className="flex items-center gap-2 bg-gray-100 rounded-lg p-2 pr-3">
+                  <span className="text-xs font-medium text-gray-600">{fieldDef.label}:</span>
+                  <select value={filter.value} onChange={e => updateFilterValue(filter.id, e.target.value)}
+                    className="text-sm border-0 bg-transparent focus:ring-0 p-0 pr-6">
+                    <option value="">Selecione...</option>
+                    {fieldDef.options && fieldDef.options().map((opt: any) => (
+                      <option key={opt.value} value={opt.value}>{opt.label}</option>
+                    ))}
+                  </select>
+                  <button onClick={() => removeFilter(filter.id)} className="p-1 hover:bg-gray-200 rounded">
+                    <X className="w-3 h-3 text-gray-500" />
+                  </button>
+                </div>
+              )
+            })}
+            <button onClick={clearAllFilters} className="text-xs text-red-600 hover:text-red-700 font-medium px-2">Limpar todos</button>
+          </div>
+        )}
+        <div className="relative">
+          <button onClick={() => setShowFilterOptions(!showFilterOptions)}
+            className="flex items-center gap-2 px-3 py-2 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 text-sm">
+            <Plus className="w-4 h-4" /> Adicionar Filtro <ChevronDown className="w-4 h-4" />
+          </button>
+          {showFilterOptions && (
+            <div className="absolute top-full mt-1 left-0 bg-white border border-gray-200 rounded-lg shadow-lg z-10 max-h-64 overflow-y-auto w-64">
+              {FILTER_FIELDS.filter(f => !activeFilters.find(af => af.field === f.key)).map(field => (
+                <button key={field.key} onClick={() => addFilter(field.key)}
+                  className="w-full text-left px-4 py-2 hover:bg-gray-50 text-sm">{field.label}</button>
+              ))}
+              {FILTER_FIELDS.filter(f => !activeFilters.find(af => af.field === f.key)).length === 0 && (
+                <div className="px-4 py-3 text-sm text-gray-500 text-center">Todos os filtros j\u00e1 foram adicionados</div>
+              )}
+            </div>
+          )}
         </div>
       </div>
 

@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from 'react'
-import { Plus, Pencil, Trash2, X, Truck, User, Minus, Check, CarFront, Loader2, Filter } from 'lucide-react'
+import { Plus, Pencil, Trash2, X, Truck, User, Minus, Check, CarFront, Loader2, Filter, ChevronDown } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { getOrdens, createOrdem, updateOrdem, deleteOrdem, getCadastros, getProdutos, getVeiculos, getPrecos, getOrdemTransportadores, addOrdemTransportador, removeOrdemTransportador, getOperacoes, createCadastro, createProduto, createPreco } from '../services/api'
 
@@ -56,6 +56,8 @@ export default function Ordens() {
   const [editing, setEditing] = useState<any>(null)
   const [form, setForm] = useState(emptyForm)
   const [searchTerm, setSearchTerm] = useState('')
+  const [activeFilters, setActiveFilters] = useState<{id: string, field: string, value: string}[]>([])
+  const [showFilterOptions, setShowFilterOptions] = useState(false)
 
   // Transportadores vinculados a ordem (junction table)
   const [ordemTransps, setOrdemTransps] = useState<any[]>([])
@@ -126,6 +128,35 @@ export default function Ordens() {
       const data = await getOrdemTransportadores(ordemId)
       setOrdemTransps(data)
     } catch { setOrdemTransps([]) }
+  }
+
+  // Campos filtráveis
+  const FILTER_FIELDS = [
+    { key: 'operacao', label: 'Operação', type: 'select', options: () => operacoes.map((o: any) => ({ value: o.id, label: o.nome })) },
+    { key: 'status', label: 'Status', type: 'select', options: () => STATUS_OPTIONS.map(s => ({ value: s.value, label: s.label })) },
+    { key: 'origem', label: 'Origem', type: 'select', options: () => origens.map((o: any) => ({ value: o.id, label: o.nome_fantasia || o.nome })) },
+    { key: 'destino', label: 'Destino', type: 'select', options: () => origens.map((o: any) => ({ value: o.id, label: o.nome_fantasia || o.nome })) },
+    { key: 'produto', label: 'Produto', type: 'select', options: () => produtos.map((p: any) => ({ value: p.id, label: p.nome })) },
+    { key: 'nome', label: 'Nome da Ordem', type: 'text' },
+  ]
+
+  const addFilter = (field: string) => {
+    const id = Date.now().toString()
+    setActiveFilters([...activeFilters, { id, field, value: '' }])
+    setShowFilterOptions(false)
+  }
+
+  const updateFilterValue = (id: string, value: string) => {
+    setActiveFilters(activeFilters.map(f => f.id === id ? { ...f, value } : f))
+  }
+
+  const removeFilter = (id: string) => {
+    setActiveFilters(activeFilters.filter(f => f.id !== id))
+  }
+
+  const clearAllFilters = () => {
+    setActiveFilters([])
+    setSearchTerm('')
   }
 
   const openNew = () => { setEditing(null); setForm(emptyForm); setOrdemTransps([]); setSelectedTranspId(''); setShowForm(true) }
@@ -384,16 +415,31 @@ export default function Ordens() {
   const statusInfo = (s: string) => STATUS_OPTIONS.find(x => x.value === s) || STATUS_OPTIONS[0]
 
   const filteredItems = items.filter(item => {
-    if (!searchTerm) return true
-    const term = searchTerm.toLowerCase()
-    return (
-      (item.numero_ordem_fmt || item.numero_ordem || '').toLowerCase().includes(term) ||
-      (item.nome_ordem || '').toLowerCase().includes(term) ||
-      (item.operacao_nome || '').toLowerCase().includes(term) ||
-      (item.origem_nome || '').toLowerCase().includes(term) ||
-      (item.destino_nome || '').toLowerCase().includes(term) ||
-      (item.produto_nome || '').toLowerCase().includes(term)
-    )
+    if (searchTerm) {
+      const term = searchTerm.toLowerCase()
+      const matchesSearch = (
+        (item.numero_ordem_fmt || item.numero_ordem || '').toLowerCase().includes(term) ||
+        (item.nome_ordem || '').toLowerCase().includes(term) ||
+        (item.operacao_nome || '').toLowerCase().includes(term) ||
+        (item.origem_nome || '').toLowerCase().includes(term) ||
+        (item.destino_nome || '').toLowerCase().includes(term) ||
+        (item.produto_nome || '').toLowerCase().includes(term)
+      )
+      if (!matchesSearch) return false
+    }
+
+    for (const filter of activeFilters) {
+      if (!filter.value) continue
+      switch (filter.field) {
+        case 'operacao': if (item.operacao_id !== filter.value) return false; break
+        case 'status': if (item.status !== filter.value) return false; break
+        case 'origem': if (item.origem_id !== filter.value) return false; break
+        case 'destino': if (item.destino_id !== filter.value) return false; break
+        case 'produto': if (item.produto_id !== filter.value) return false; break
+        case 'nome': if (!(item.nome_ordem || '').toLowerCase().includes(filter.value.toLowerCase())) return false; break
+      }
+    }
+    return true
   })
 
   return (
@@ -405,12 +451,60 @@ export default function Ordens() {
         </button>
       </div>
 
-      <div className="mb-4">
-        <div className="relative">
+      <div className="mb-4 space-y-3">
+        <div className="relative flex-1">
           <input type="text" placeholder="Buscar por ordem, operação, origem, destino, produto..."
             value={searchTerm} onChange={e => setSearchTerm(e.target.value)}
             className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent" />
           <Filter className="w-5 h-5 text-gray-400 absolute left-3 top-2.5" />
+        </div>
+
+        {activeFilters.length > 0 && (
+          <div className="flex flex-wrap gap-2 items-center">
+            {activeFilters.map((filter) => {
+              const fieldDef = FILTER_FIELDS.find(f => f.key === filter.field)
+              if (!fieldDef) return null
+              return (
+                <div key={filter.id} className="flex items-center gap-2 bg-gray-100 rounded-lg p-2 pr-3">
+                  <span className="text-xs font-medium text-gray-600">{fieldDef.label}:</span>
+                  {fieldDef.type === 'select' ? (
+                    <select value={filter.value} onChange={e => updateFilterValue(filter.id, e.target.value)}
+                      className="text-sm border-0 bg-transparent focus:ring-0 p-0 pr-6">
+                      <option value="">Selecione...</option>
+                      {fieldDef.options && fieldDef.options().map((opt: any) => (
+                        <option key={opt.value} value={opt.value}>{opt.label}</option>
+                      ))}
+                    </select>
+                  ) : (
+                    <input type="text" value={filter.value} onChange={e => updateFilterValue(filter.id, e.target.value)}
+                      placeholder="Digite..." className="text-sm border-0 bg-transparent focus:ring-0 p-0 w-32" />
+                  )}
+                  <button onClick={() => removeFilter(filter.id)} className="p-1 hover:bg-gray-200 rounded">
+                    <X className="w-3 h-3 text-gray-500" />
+                  </button>
+                </div>
+              )
+            })}
+            <button onClick={clearAllFilters} className="text-xs text-red-600 hover:text-red-700 font-medium px-2">Limpar todos</button>
+          </div>
+        )}
+
+        <div className="relative">
+          <button onClick={() => setShowFilterOptions(!showFilterOptions)}
+            className="flex items-center gap-2 px-3 py-2 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 text-sm">
+            <Plus className="w-4 h-4" /> Adicionar Filtro <ChevronDown className="w-4 h-4" />
+          </button>
+          {showFilterOptions && (
+            <div className="absolute top-full mt-1 left-0 bg-white border border-gray-200 rounded-lg shadow-lg z-10 max-h-64 overflow-y-auto w-64">
+              {FILTER_FIELDS.filter(f => !activeFilters.find(af => af.field === f.key)).map(field => (
+                <button key={field.key} onClick={() => addFilter(field.key)}
+                  className="w-full text-left px-4 py-2 hover:bg-gray-50 text-sm">{field.label}</button>
+              ))}
+              {FILTER_FIELDS.filter(f => !activeFilters.find(af => af.field === f.key)).length === 0 && (
+                <div className="px-4 py-3 text-sm text-gray-500 text-center">Todos os filtros já foram adicionados</div>
+              )}
+            </div>
+          )}
         </div>
       </div>
 
