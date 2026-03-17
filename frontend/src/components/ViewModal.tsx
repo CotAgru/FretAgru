@@ -30,7 +30,7 @@ export default function ViewModal({ title, isOpen, onClose, onEdit, children }: 
         </div>
         
         {/* Content - Scroll otimizado */}
-        <div className="overflow-y-auto p-4 sm:p-6 bg-gray-50" style={{ maxHeight: 'calc(100vh - 140px)' }}>
+        <div className="overflow-y-auto p-4 sm:p-6 bg-gray-50 max-h-[calc(100vh-140px)] sm:max-h-[calc(92vh-160px)]">
           {children}
         </div>
       </div>
