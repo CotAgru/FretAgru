@@ -1,8 +1,12 @@
-import { useEffect, useState, useRef } from 'react'
-import { Plus, Pencil, Trash2, X, Camera, Upload, Loader2, FileText, Sparkles, Settings, ZoomIn, Filter, ChevronDown, ExternalLink, Package, Truck, Scale, Target } from 'lucide-react'
+import { useEffect, useState, useRef, useMemo } from 'react'
+import { Plus, Pencil, Trash2, X, Camera, Upload, Loader2, FileText, Sparkles, Settings, ZoomIn, Filter, ChevronDown, ExternalLink, Package, Truck, Scale, Target, ArrowUp, ArrowDown, ArrowUpDown } from 'lucide-react'
 import toast from 'react-hot-toast'
-import { getRomaneios, createRomaneio, updateRomaneio, deleteRomaneio, getOrdens, getOperacoes, getCadastros, getVeiculos, getProdutos, getTiposNf, getTiposTicket, getAnosSafra, uploadRomaneioImage } from '../services/api'
+import { getRomaneios, createRomaneio, updateRomaneio, deleteRomaneio, getOrdens, getOperacoes, getCadastros, getVeiculos, getProdutos, getTiposNf, getTiposTicket, getAnosSafra, uploadRomaneioImage, getPrecos } from '../services/api'
 import ViewModal, { Field, Section } from '../components/ViewModal'
+import { fmtData, fmtInt, fmtBRL } from '../utils/format'
+import Pagination, { usePagination } from '../components/Pagination'
+import ExportButtons from '../components/ExportButtons'
+import { exportToPDF, exportToExcel } from '../utils/export'
 
 const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY || ''
 
@@ -65,6 +69,7 @@ export default function Romaneios() {
   const [tiposNf, setTiposNf] = useState<any[]>([])
   const [tiposTicket, setTiposTicket] = useState<any[]>([])
   const [anosSafra, setAnosSafra] = useState<any[]>([])
+  const [precos, setPrecos] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [showForm, setShowForm] = useState(false)
   const [editing, setEditing] = useState<any>(null)
@@ -75,6 +80,7 @@ export default function Romaneios() {
   const [lightboxImage, setLightboxImage] = useState<string | null>(null)
   const [showColumnConfig, setShowColumnConfig] = useState(false)
   const [searchTerm, setSearchTerm] = useState('')
+  const pagination = usePagination(25)
   const [activeFilters, setActiveFilters] = useState<{id: string, field: string, value: string}[]>([])
   const [showFilterOptions, setShowFilterOptions] = useState(false)
   const [viewingItem, setViewingItem] = useState<any>(null)
@@ -125,6 +131,7 @@ export default function Romaneios() {
     { key: 'peso_corrigido', label: 'Peso Corrigido', visible: false, order: 40 },
     { key: 'transgenia', label: 'Transgenia', visible: false, order: 41 },
     { key: 'observacoes', label: 'Observações', visible: false, order: 42 },
+    { key: 'valor_frete', label: 'Valor Frete', visible: false, order: 43 },
   ]
   const [columns, setColumns] = useState(() => {
     const saved = localStorage.getItem('romaneios_columns')
@@ -133,13 +140,42 @@ export default function Romaneios() {
 
   const load = () => {
     setLoading(true)
-    Promise.all([getRomaneios(), getOrdens(), getOperacoes(), getCadastros(), getVeiculos(), getProdutos(), getTiposNf(), getTiposTicket(), getAnosSafra()])
-      .then(([r, o, ops, cad, veic, prod, tnf, tt, as_]) => {
+    Promise.all([getRomaneios(), getOrdens(), getOperacoes(), getCadastros(), getVeiculos(), getProdutos(), getTiposNf(), getTiposTicket(), getAnosSafra(), getPrecos()])
+      .then(([r, o, ops, cad, veic, prod, tnf, tt, as_, pr]) => {
         setItems(r); setOrdens(o); setOperacoes(ops); setCadastros(cad)
-        setVeiculos(veic); setProdutos(prod); setTiposNf(tnf); setTiposTicket(tt); setAnosSafra(as_)
+        setVeiculos(veic); setProdutos(prod); setTiposNf(tnf); setTiposTicket(tt); setAnosSafra(as_); setPrecos(pr)
       })
       .catch(() => toast.error('Erro ao carregar'))
       .finally(() => setLoading(false))
+  }
+
+  // Cálculo automático de frete: peso × preço
+  const calcularFrete = (item: any): { valor: number | null; label: string } => {
+    if (!item.ordem_id) return { valor: null, label: '-' }
+    const ordem = ordens.find((o: any) => o.id === item.ordem_id)
+    if (!ordem?.preco_id) return { valor: null, label: '-' }
+    const preco = precos.find((p: any) => p.id === ordem.preco_id)
+    if (!preco?.valor) return { valor: null, label: '-' }
+    const pesoKg = item.peso_corrigido || item.peso_liquido || 0
+    if (!pesoKg) return { valor: null, label: '-' }
+    let valorFrete = 0
+    switch (preco.unidade_preco) {
+      case 'R$/ton':
+        valorFrete = (pesoKg / 1000) * preco.valor
+        break
+      case 'R$/sc':
+        valorFrete = (pesoKg / 60) * preco.valor
+        break
+      case 'R$/viagem':
+        valorFrete = preco.valor
+        break
+      case 'R$/km':
+        valorFrete = (preco.distancia_km || 0) * preco.valor
+        break
+      default:
+        return { valor: null, label: '-' }
+    }
+    return { valor: valorFrete, label: fmtBRL(valorFrete) }
   }
   useEffect(() => { load() }, [])
 
@@ -501,7 +537,7 @@ Use 0 para campos numéricos não encontrados e "" para textos. Pesos em KG inte
     switch (colKey) {
       case 'operacao': return operacoes.find(o => o.id === item.operacao_id)?.nome || '-'
       case 'ordem': return item.ordem_nome || '-'
-      case 'data_saida': return item.data_saida_origem || item.data_emissao || '-'
+      case 'data_saida': return fmtData(item.data_saida_origem || item.data_emissao) || '-'
       case 'produtor': return item.produtor_id ? cadNome(item.produtor_id) : item.produtor || '-'
       case 'produto': return item.produto_id ? prodNome(item.produto_id) : item.produto || '-'
       case 'origem': return item.origem_id ? cadNome(item.origem_id) : '-'
@@ -516,6 +552,41 @@ Use 0 para campos numéricos não encontrados e "" para textos. Pesos em KG inte
       case 'tipo_ticket': return tiposTicket.find(t => t.id === item.tipo_ticket_id)?.nome || '-'
       case 'tipo_nf': return tiposNf.find(t => t.id === item.tipo_nf_id)?.nome || '-'
       case 'nfe': return item.nfe_numero || '-'
+      case 'data_entrada_destino': return fmtData(item.data_entrada_destino) || '-'
+      case 'data_saida_destino': return fmtData(item.data_saida_destino) || '-'
+      case 'peso_bruto': return item.peso_bruto ? fmtNum(item.peso_bruto) : '-'
+      case 'tara': return item.tara ? fmtNum(item.tara) : '-'
+      case 'peso_liquido': return item.peso_liquido ? fmtNum(item.peso_liquido) : '-'
+      case 'umidade_perc': return item.umidade_perc != null ? fmtPerc(item.umidade_perc) : '-'
+      case 'impureza_perc': return item.impureza_perc != null ? fmtPerc(item.impureza_perc) : '-'
+      case 'avariados_perc': return item.avariados_perc != null ? fmtPerc(item.avariados_perc) : '-'
+      case 'ardidos_perc': return item.ardidos_perc != null ? fmtPerc(item.ardidos_perc) : '-'
+      case 'esverdeados_perc': return item.esverdeados_perc != null ? fmtPerc(item.esverdeados_perc) : '-'
+      case 'partidos_perc': return item.partidos_perc != null ? fmtPerc(item.partidos_perc) : '-'
+      case 'quebrados_perc': return item.quebrados_perc != null ? fmtPerc(item.quebrados_perc) : '-'
+      case 'umidade_desc': return item.umidade_desc ? fmtNum(item.umidade_desc) : '-'
+      case 'impureza_desc': return item.impureza_desc ? fmtNum(item.impureza_desc) : '-'
+      case 'avariados_desc': return item.avariados_desc ? fmtNum(item.avariados_desc) : '-'
+      case 'ardidos_desc': return item.ardidos_desc ? fmtNum(item.ardidos_desc) : '-'
+      case 'esverdeados_desc': return item.esverdeados_desc ? fmtNum(item.esverdeados_desc) : '-'
+      case 'partidos_desc': return item.partidos_desc ? fmtNum(item.partidos_desc) : '-'
+      case 'quebrados_desc': return item.quebrados_desc ? fmtNum(item.quebrados_desc) : '-'
+      case 'desconto_total': return item.desconto_kg ? fmtNum(item.desconto_kg) : '-'
+      case 'peso_corrigido': return item.peso_corrigido ? fmtNum(item.peso_corrigido) : '-'
+      case 'transgenia': return item.transgenia || '-'
+      case 'observacoes': return item.observacoes || '-'
+      case 'cnpj_cpf': return item.cnpj_cpf || '-'
+      case 'valor_frete': return calcularFrete(item).label
+      case 'tempo_permanencia': {
+        if (!item.data_entrada_destino || !item.data_saida_destino) return '-'
+        const entrada = new Date(item.data_entrada_destino)
+        const saida = new Date(item.data_saida_destino)
+        const diff = saida.getTime() - entrada.getTime()
+        if (diff <= 0) return '-'
+        const horas = Math.floor(diff / 3600000)
+        const mins = Math.floor((diff % 3600000) / 60000)
+        return `${horas}h${mins > 0 ? ` ${mins}min` : ''}`
+      }
       default: return '-'
     }
   }
@@ -597,11 +668,75 @@ Use 0 para campos numéricos não encontrados e "" para textos. Pesos em KG inte
   // Colunas visíveis ordenadas
   const visibleColumns = columns.filter((c: any) => c.visible).sort((a: any, b: any) => a.order - b.order)
 
+  // Ordenação por colunas
+  const [romSortKey, setRomSortKey] = useState<string | null>(null)
+  const [romSortDir, setRomSortDir] = useState<'asc' | 'desc' | null>(null)
+
+  const toggleRomSort = (key: string) => {
+    if (romSortKey !== key) { setRomSortKey(key); setRomSortDir('asc') }
+    else if (romSortDir === 'asc') { setRomSortDir('desc') }
+    else { setRomSortKey(null); setRomSortDir(null) }
+  }
+
+  // Mapear colKey para campo raw sortável
+  const getSortValue = (item: any, colKey: string): any => {
+    switch (colKey) {
+      case 'operacao': return operacoes.find(o => o.id === item.operacao_id)?.nome || ''
+      case 'ordem': return item.ordem_nome || ''
+      case 'data_saida': return item.data_saida_origem || item.data_emissao || ''
+      case 'data_entrada_destino': return item.data_entrada_destino || ''
+      case 'data_saida_destino': return item.data_saida_destino || ''
+      case 'produtor': return item.produtor_id ? cadNome(item.produtor_id) : item.produtor || ''
+      case 'produto': return item.produto_id ? prodNome(item.produto_id) : item.produto || ''
+      case 'origem': return item.origem_id ? cadNome(item.origem_id) : ''
+      case 'destino': return item.destinatario_id ? cadNome(item.destinatario_id) : ''
+      case 'placa': return item.veiculo_id ? veicPlaca(item.veiculo_id) : item.placa || ''
+      case 'ticket': return item.numero_ticket || ''
+      case 'peso_liq_sdesc': return item.peso_liquido ?? 0
+      case 'peso_liq_cdesc': return item.peso_corrigido ?? 0
+      case 'motorista': return item.motorista_id ? cadNome(item.motorista_id) : ''
+      case 'transportadora': return item.transportadora_id ? cadNome(item.transportadora_id) : ''
+      case 'ano_safra': return anosSafra.find(a => a.id === item.ano_safra_id)?.nome || ''
+      case 'peso_bruto': return item.peso_bruto ?? 0
+      case 'tara': return item.tara ?? 0
+      case 'peso_liquido': return item.peso_liquido ?? 0
+      case 'desconto_total': return item.desconto_kg ?? 0
+      case 'peso_corrigido': return item.peso_corrigido ?? 0
+      default: return getCellValue(item, colKey)
+    }
+  }
+
+  const sortedFilteredItems = useMemo(() => {
+    if (!romSortKey || !romSortDir) return filteredItems
+    const dir = romSortDir === 'asc' ? 1 : -1
+    return [...filteredItems].sort((a, b) => {
+      let va = getSortValue(a, romSortKey)
+      let vb = getSortValue(b, romSortKey)
+      if (va == null && vb == null) return 0
+      if (va == null) return 1
+      if (vb == null) return -1
+      if (typeof va === 'number' && typeof vb === 'number') return (va - vb) * dir
+      va = String(va).toLowerCase()
+      vb = String(vb).toLowerCase()
+      return va.localeCompare(vb, 'pt-BR') * dir
+    })
+  }, [filteredItems, romSortKey, romSortDir])
+
   return (
     <div>
       <div className="flex items-center justify-between mb-4 sm:mb-6 gap-2">
         <h1 className="text-xl sm:text-2xl font-bold text-gray-800">Romaneios</h1>
         <div className="flex gap-2">
+          <ExportButtons
+            onExportExcel={() => {
+              const cols = visibleColumns.map((c: any) => ({ key: c.key, label: c.label, align: ['peso_liq_sdesc','peso_liq_cdesc','valor_frete'].includes(c.key) ? 'right' as const : 'left' as const }))
+              exportToExcel({ filename: 'romaneios', title: 'Romaneios', columns: cols, data: sortedFilteredItems, getValue: (item, key) => getCellValue(item, key) })
+            }}
+            onExportPDF={() => {
+              const cols = visibleColumns.map((c: any) => ({ key: c.key, label: c.label, align: ['peso_liq_sdesc','peso_liq_cdesc','valor_frete'].includes(c.key) ? 'right' as const : 'left' as const }))
+              exportToPDF({ filename: 'romaneios', title: 'Romaneios', columns: cols, data: sortedFilteredItems, getValue: (item, key) => getCellValue(item, key) })
+            }}
+          />
           <button onClick={() => setShowColumnConfig(true)} className="flex items-center gap-2 bg-gray-600 text-white px-3 py-2 rounded-lg hover:bg-gray-700 text-sm">
             <Settings className="w-4 h-4" /> Colunas
           </button>
@@ -688,16 +823,27 @@ Use 0 para campos numéricos não encontrados e "" para textos. Pesos em KG inte
           <table className="w-full text-sm min-w-[750px]">
             <thead className="bg-gray-50 border-b">
               <tr>
-                {visibleColumns.map((col: any) => (
-                  <th key={col.key} className={`px-4 py-3 font-semibold text-gray-600 ${['peso_liq_sdesc','peso_liq_cdesc'].includes(col.key) ? 'text-right' : 'text-left'}`}>
-                    {col.label}
-                  </th>
-                ))}
+                {visibleColumns.map((col: any) => {
+                  const isRight = ['peso_liq_sdesc','peso_liq_cdesc','peso_bruto','tara','peso_liquido','desconto_total','peso_corrigido'].includes(col.key)
+                  const isActive = romSortKey === col.key
+                  return (
+                    <th key={col.key}
+                      className={`px-4 py-3 font-semibold text-gray-600 cursor-pointer select-none hover:bg-gray-100 transition-colors ${isRight ? 'text-right' : 'text-left'}`}
+                      onClick={() => toggleRomSort(col.key)}>
+                      <div className={`flex items-center gap-1 ${isRight ? 'justify-end' : ''}`}>
+                        <span>{col.label}</span>
+                        {isActive && romSortDir === 'asc' && <ArrowUp className="w-3.5 h-3.5 text-green-600" />}
+                        {isActive && romSortDir === 'desc' && <ArrowDown className="w-3.5 h-3.5 text-green-600" />}
+                        {!isActive && <ArrowUpDown className="w-3.5 h-3.5 text-gray-300" />}
+                      </div>
+                    </th>
+                  )
+                })}
                 <th className="text-right px-4 py-3 font-semibold text-gray-600">Ações</th>
               </tr>
             </thead>
             <tbody className="divide-y">
-              {filteredItems.map((item: any) => (
+              {pagination.paginate(sortedFilteredItems).map((item: any) => (
                 <tr key={item.id} className="hover:bg-gray-50 cursor-pointer" onClick={() => setViewingItem(item)}>
                   {visibleColumns.map((col: any) => (
                     <td key={col.key} className={`px-4 py-3 ${['peso_liq_sdesc','peso_liq_cdesc'].includes(col.key) ? 'text-right font-semibold' : ''} ${col.key === 'ordem' ? 'text-xs text-blue-600 font-semibold' : ''} ${['placa','ticket'].includes(col.key) ? 'font-mono text-xs' : ''}`}>
@@ -710,9 +856,16 @@ Use 0 para campos numéricos não encontrados e "" para textos. Pesos em KG inte
                   </td>
                 </tr>
               ))}
-              {filteredItems.length === 0 && <tr><td colSpan={visibleColumns.length + 1} className="px-4 py-8 text-center text-gray-400">Nenhum romaneio encontrado</td></tr>}
+              {sortedFilteredItems.length === 0 && <tr><td colSpan={visibleColumns.length + 1} className="px-4 py-8 text-center text-gray-400">Nenhum romaneio encontrado</td></tr>}
             </tbody>
           </table>
+          <Pagination
+            currentPage={pagination.page}
+            totalItems={sortedFilteredItems.length}
+            pageSize={pagination.pageSize}
+            onPageChange={pagination.setPage}
+            onPageSizeChange={(s) => { pagination.setPageSize(s); pagination.resetPage() }}
+          />
         </div>
       )}
 
@@ -1058,8 +1211,8 @@ Use 0 para campos numéricos não encontrados e "" para textos. Pesos em KG inte
               <Field label="Tipo Ticket" value={tiposTicket.find(t => t.id === viewingItem.tipo_ticket_id)?.nome} />
               <Field label="NF-e" value={viewingItem.nfe_numero} />
               <Field label="Tipo NF" value={tiposNf.find(t => t.id === viewingItem.tipo_nf_id)?.nome} />
-              <Field label="Data Saída Origem" value={viewingItem.data_saida_origem} />
-              <Field label="Data Entrada Destino" value={viewingItem.data_entrada_destino} />
+              <Field label="Data Saída Origem" value={fmtData(viewingItem.data_saida_origem)} />
+              <Field label="Data Entrada Destino" value={fmtData(viewingItem.data_entrada_destino)} />
             </Section>
 
             <Section title="Origem, Destino e Produto" icon={<Target className="w-5 h-5" />}>
@@ -1089,6 +1242,22 @@ Use 0 para campos numéricos não encontrados e "" para textos. Pesos em KG inte
               <Field label="Ardidos %" value={viewingItem.ardidos_perc ? fmtPerc(viewingItem.ardidos_perc) : '-'} />
               <Field label="Desc. Total (kg)" value={viewingItem.desconto_kg ? fmtNum(viewingItem.desconto_kg) : '-'} />
             </Section>
+
+            {(() => {
+              const frete = calcularFrete(viewingItem)
+              if (frete.valor !== null) {
+                const ordem = ordens.find((o: any) => o.id === viewingItem.ordem_id)
+                const preco = ordem?.preco_id ? precos.find((p: any) => p.id === ordem.preco_id) : null
+                return (
+                  <Section title="Valor do Frete" icon={<Scale className="w-5 h-5" />}>
+                    <Field label="Valor do Frete" value={frete.label} highlight />
+                    <Field label="Preço Contratado" value={preco ? `${fmtBRL(preco.valor)} ${preco.unidade_preco}` : '-'} />
+                    <Field label="Base de Cálculo" value={viewingItem.peso_corrigido ? `${fmtNum(viewingItem.peso_corrigido)} kg (corrigido)` : viewingItem.peso_liquido ? `${fmtNum(viewingItem.peso_liquido)} kg (líquido)` : '-'} />
+                  </Section>
+                )
+              }
+              return null
+            })()}
 
             {viewingItem.imagem_url && (
               <Section title="Anexo do Romaneio" icon={<Camera className="w-5 h-5" />}>

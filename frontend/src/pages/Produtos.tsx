@@ -3,6 +3,8 @@ import { Plus, Pencil, Trash2, X, Filter, ChevronDown } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { getProdutos, createProduto, updateProduto, deleteProduto } from '../services/api'
 import ViewModal, { Field } from '../components/ViewModal'
+import { useSort } from '../hooks/useSort'
+import SortHeader from '../components/SortHeader'
 
 const TIPOS = ['Grao', 'Insumo']
 const UNIDADES = ['ton', 'kg', 'sc', 'l']
@@ -89,6 +91,8 @@ export default function Produtos() {
     return true
   })
 
+  const { sortedData: sortedItems, sortKey, sortDirection, toggleSort } = useSort(filteredItems)
+
   return (
     <div>
       <div className="flex items-center justify-between mb-4 sm:mb-6 gap-2">
@@ -156,15 +160,15 @@ export default function Produtos() {
           <table className="w-full text-sm min-w-[450px]">
             <thead className="bg-gray-50 border-b">
               <tr>
-                <th className="text-left px-4 py-3 font-semibold text-gray-600">Nome</th>
-                <th className="text-left px-4 py-3 font-semibold text-gray-600">Tipo</th>
-                <th className="text-left px-4 py-3 font-semibold text-gray-600">Unidade</th>
-                <th className="text-left px-4 py-3 font-semibold text-gray-600">Status</th>
+                <SortHeader field="nome" label="Nome" sortKey={sortKey} sortDirection={sortDirection} onSort={toggleSort} />
+                <SortHeader field="tipo" label="Tipo" sortKey={sortKey} sortDirection={sortDirection} onSort={toggleSort} />
+                <SortHeader field="unidade_medida" label="Unidade" sortKey={sortKey} sortDirection={sortDirection} onSort={toggleSort} />
+                <SortHeader field="ativo" label="Status" sortKey={sortKey} sortDirection={sortDirection} onSort={toggleSort} />
                 <th className="text-right px-4 py-3 font-semibold text-gray-600">Ações</th>
               </tr>
             </thead>
             <tbody className="divide-y">
-              {filteredItems.map((item: any) => (
+              {sortedItems.map((item: any) => (
                 <tr key={item.id} className="hover:bg-gray-50 cursor-pointer" onClick={() => setViewingItem(item)}>
                   <td className="px-4 py-3 font-medium">{item.nome}</td>
                   <td className="px-4 py-3"><span className={`px-2 py-1 rounded-full text-xs font-medium ${item.tipo === 'Grao' ? 'bg-yellow-100 text-yellow-700' : 'bg-blue-100 text-blue-700'}`}>{item.tipo === 'Grao' ? 'Grao' : 'Insumo'}</span></td>
@@ -176,7 +180,7 @@ export default function Produtos() {
                   </td>
                 </tr>
               ))}
-              {filteredItems.length === 0 && <tr><td colSpan={5} className="px-4 py-8 text-center text-gray-400">Nenhum produto cadastrado</td></tr>}
+              {sortedItems.length === 0 && <tr><td colSpan={5} className="px-4 py-8 text-center text-gray-400">Nenhum produto cadastrado</td></tr>}
             </tbody>
           </table>
         </div>

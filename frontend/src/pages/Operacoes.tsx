@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { fmtData, fmtDataHora } from '../utils/format'
 import { Plus, Pencil, Trash2, X, FolderOpen, FileText, Calendar } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { getOperacoes, createOperacao, updateOperacao, deleteOperacao, getAnosSafra } from '../services/api'
@@ -92,9 +93,9 @@ export default function Operacoes() {
                 {item.descricao && <p className="text-sm text-gray-500 mb-2 line-clamp-2">{item.descricao}</p>}
                 {item.ano_safra_nome && <p className="text-xs text-blue-600 font-medium mb-2">Safra: {item.ano_safra_nome}</p>}
                 <div className="flex items-center gap-3 text-xs text-gray-400 mb-3">
-                  {item.data_inicio && <span>Início: {item.data_inicio}</span>}
-                  {item.data_fim && <span>Fim: {item.data_fim}</span>}
-                  {!item.data_inicio && !item.data_fim && <span>Criado em {new Date(item.created_at).toLocaleDateString('pt-BR')}</span>}
+                  {item.data_inicio && <span>Início: {fmtData(item.data_inicio)}</span>}
+                  {item.data_fim && <span>Fim: {fmtData(item.data_fim)}</span>}
+                  {!item.data_inicio && !item.data_fim && <span>Criado em {fmtDataHora(item.created_at)}</span>}
                 </div>
                 <div className="flex justify-end gap-1 border-t pt-2" onClick={e => e.stopPropagation()}>
                   <button onClick={() => openEdit(item)} className="p-1.5 text-blue-600 hover:bg-blue-50 rounded"><Pencil className="w-4 h-4" /></button>
@@ -183,12 +184,12 @@ export default function Operacoes() {
               <Field label="Nome" value={viewingItem.nome} highlight />
               <Field label="Status" value={statusInfo(viewingItem.status).label} highlight />
               <Field label="Ano Safra" value={viewingItem.ano_safra_nome || '-'} />
-              <Field label="Criado em" value={new Date(viewingItem.created_at).toLocaleString('pt-BR')} />
+              <Field label="Criado em" value={fmtDataHora(viewingItem.created_at)} />
             </Section>
 
             <Section title="Período" icon={<Calendar className="w-5 h-5" />}>
-              <Field label="Data Início" value={viewingItem.data_inicio || '-'} />
-              <Field label="Data Fim" value={viewingItem.data_fim || '-'} />
+              <Field label="Data Início" value={fmtData(viewingItem.data_inicio) || '-'} />
+              <Field label="Data Fim" value={fmtData(viewingItem.data_fim) || '-'} />
             </Section>
 
             {viewingItem.descricao && (

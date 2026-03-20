@@ -3,6 +3,9 @@ import { Plus, Pencil, Trash2, X, Filter, ChevronDown } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { getVeiculos, createVeiculo, updateVeiculo, deleteVeiculo, getCadastros, getTiposCaminhao } from '../services/api'
 import ViewModal, { Field } from '../components/ViewModal'
+import { useSort } from '../hooks/useSort'
+import SortHeader from '../components/SortHeader'
+import { fmtInt } from '../utils/format'
 
 const emptyForm = { cadastro_id: '', placa: '', tipo_caminhao: '', eixos: 0, peso_pauta_kg: 0, marca: '', modelo: '', ano: '', observacoes: '', ativo: true }
 
@@ -120,6 +123,8 @@ export default function Veiculos() {
     return true
   })
 
+  const { sortedData: sortedItems, sortKey, sortDirection, toggleSort } = useSort(filteredItems)
+
   return (
     <div>
       <div className="flex items-center justify-between mb-4 sm:mb-6 gap-2">
@@ -187,31 +192,31 @@ export default function Veiculos() {
           <table className="w-full text-sm min-w-[600px]">
             <thead className="bg-gray-50 border-b">
               <tr>
-                <th className="text-left px-4 py-3 font-semibold text-gray-600">Placa</th>
-                <th className="text-left px-4 py-3 font-semibold text-gray-600">Tipo Caminhao</th>
-                <th className="text-center px-4 py-3 font-semibold text-gray-600">Eixos</th>
-                <th className="text-left px-4 py-3 font-semibold text-gray-600">Marca/Modelo</th>
-                <th className="text-left px-4 py-3 font-semibold text-gray-600">Proprietário</th>
-                <th className="text-right px-4 py-3 font-semibold text-gray-600">Peso Pauta (Kg)</th>
+                <SortHeader field="placa" label="Placa" sortKey={sortKey} sortDirection={sortDirection} onSort={toggleSort} />
+                <SortHeader field="tipo_caminhao" label="Tipo Caminhão" sortKey={sortKey} sortDirection={sortDirection} onSort={toggleSort} />
+                <SortHeader field="eixos" label="Eixos" sortKey={sortKey} sortDirection={sortDirection} onSort={toggleSort} align="center" />
+                <SortHeader field="marca" label="Marca/Modelo" sortKey={sortKey} sortDirection={sortDirection} onSort={toggleSort} />
+                <SortHeader field="proprietario_nome" label="Proprietário" sortKey={sortKey} sortDirection={sortDirection} onSort={toggleSort} />
+                <SortHeader field="peso_pauta_kg" label="Peso Pauta (Kg)" sortKey={sortKey} sortDirection={sortDirection} onSort={toggleSort} align="right" />
                 <th className="text-right px-4 py-3 font-semibold text-gray-600">Ações</th>
               </tr>
             </thead>
             <tbody className="divide-y">
-              {filteredItems.map((item: any) => (
+              {sortedItems.map((item: any) => (
                 <tr key={item.id} className="hover:bg-gray-50 cursor-pointer" onClick={() => setViewingItem(item)}>
                   <td className="px-4 py-3 font-mono font-medium">{item.placa}</td>
                   <td className="px-4 py-3">{item.tipo_caminhao}</td>
                   <td className="px-4 py-3 text-center">{item.eixos}</td>
                   <td className="px-4 py-3 text-gray-600">{[item.marca, item.modelo].filter(Boolean).join(' ') || '-'}</td>
                   <td className="px-4 py-3 text-gray-600">{item.proprietario_nome || '-'}</td>
-                  <td className="px-4 py-3 text-right font-semibold">{item.peso_pauta_kg ? Number(item.peso_pauta_kg).toLocaleString('pt-BR') : '-'}</td>
+                  <td className="px-4 py-3 text-right font-semibold">{item.peso_pauta_kg ? fmtInt(item.peso_pauta_kg) : '-'}</td>
                   <td className="px-4 py-3 text-right space-x-1" onClick={e => e.stopPropagation()}>
                     <button onClick={() => openEdit(item)} className="p-1.5 text-blue-600 hover:bg-blue-50 rounded"><Pencil className="w-4 h-4" /></button>
                     <button onClick={() => remove(item.id)} className="p-1.5 text-red-600 hover:bg-red-50 rounded"><Trash2 className="w-4 h-4" /></button>
                   </td>
                 </tr>
               ))}
-              {filteredItems.length === 0 && <tr><td colSpan={7} className="px-4 py-8 text-center text-gray-400">Nenhum veiculo cadastrado</td></tr>}
+              {sortedItems.length === 0 && <tr><td colSpan={7} className="px-4 py-8 text-center text-gray-400">Nenhum veiculo cadastrado</td></tr>}
             </tbody>
           </table>
         </div>
@@ -305,7 +310,7 @@ export default function Veiculos() {
             <Field label="Placa" value={viewingItem.placa} />
             <Field label="Tipo de Caminhão" value={viewingItem.tipo_caminhao} />
             <Field label="Eixos" value={viewingItem.eixos} />
-            <Field label="Peso Pauta (kg)" value={viewingItem.peso_pauta_kg ? Number(viewingItem.peso_pauta_kg).toLocaleString('pt-BR') : '-'} />
+            <Field label="Peso Pauta (kg)" value={viewingItem.peso_pauta_kg ? fmtInt(viewingItem.peso_pauta_kg) : '-'} />
             <Field label="Marca" value={viewingItem.marca} />
             <Field label="Modelo" value={viewingItem.modelo} />
             <Field label="Ano" value={viewingItem.ano} />

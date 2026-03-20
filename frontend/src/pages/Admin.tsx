@@ -7,6 +7,7 @@ import {
   getTiposTicket, createTipoTicket, updateTipoTicket, deleteTipoTicket,
   getTiposCaminhao, createTipoCaminhao, updateTipoCaminhao, deleteTipoCaminhao,
 } from '../services/api'
+import { fmtInt } from '../utils/format'
 
 type Tab = 'ano_safra' | 'tipos_nf' | 'tipos_ticket' | 'tipos_caminhao'
 
@@ -53,7 +54,7 @@ function SimpleTable({
                   {showExtraColumns && (
                     <>
                       <td className="px-4 py-3 text-center text-gray-600">{item.eixos || 0}</td>
-                      <td className="px-4 py-3 text-center text-gray-600">{(item.peso_pauta_kg || 0).toLocaleString('pt-BR')}</td>
+                      <td className="px-4 py-3 text-center text-gray-600">{fmtInt(item.peso_pauta_kg || 0)}</td>
                     </>
                   )}
                   <td className="px-4 py-3 text-center">

@@ -3,6 +3,10 @@ import { Plus, Pencil, Trash2, X, TrendingUp, TrendingDown, Filter, FileDown, Lo
 import toast from 'react-hot-toast'
 import { getPrecos, createPreco, updatePreco, deletePreco, getCadastros, getProdutos } from '../services/api'
 import ViewModal, { Field } from '../components/ViewModal'
+import { useSort } from '../hooks/useSort'
+import SortHeader from '../components/SortHeader'
+import { fmtBRL, fmtInt, fmtData } from '../utils/format'
+import Pagination, { usePagination } from '../components/Pagination'
 
 const GOOGLE_MAPS_API_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY || ''
 const UNIDADES_PRECO = ['R$/ton', 'R$/sc', 'R$/km', 'R$/viagem']
@@ -21,6 +25,7 @@ export default function Precos() {
   const [editing, setEditing] = useState<any>(null)
   const [form, setForm] = useState(emptyForm)
   const [searchTerm, setSearchTerm] = useState('')
+  const pagination = usePagination(25)
   const [activeFilters, setActiveFilters] = useState<{id: string, field: string, value: string}[]>([])
   const [showFilterOptions, setShowFilterOptions] = useState(false)
   const [calcDist, setCalcDist] = useState(false)
@@ -142,7 +147,7 @@ export default function Precos() {
     try { await deletePreco(id); toast.success('Preco removido'); load() } catch { toast.error('Erro ao remover') }
   }
 
-  const fmtCur = (v: number) => v?.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
+  const fmtCur = (v: number) => fmtBRL(v)
 
   // Gerar documento de detalhamento do preco
   const FILTER_FIELDS = [
@@ -286,6 +291,8 @@ export default function Precos() {
     return true
   })
 
+  const { sortedData: sortedItems, sortKey, sortDirection, toggleSort } = useSort(filteredItems)
+
   return (
     <div>
       <div className="flex items-center justify-between mb-4 sm:mb-6 gap-2">
@@ -348,24 +355,24 @@ export default function Precos() {
           <table className="w-full text-sm min-w-[650px]">
             <thead className="bg-gray-50 border-b">
               <tr>
-                <th className="text-left px-3 sm:px-4 py-3 font-semibold text-gray-600">Origem</th>
-                <th className="text-left px-3 sm:px-4 py-3 font-semibold text-gray-600">Destino</th>
-                <th className="text-left px-3 sm:px-4 py-3 font-semibold text-gray-600">Produto</th>
-                <th className="text-left px-3 sm:px-4 py-3 font-semibold text-gray-600 hidden md:table-cell">Transportador</th>
-                <th className="text-right px-3 sm:px-4 py-3 font-semibold text-gray-600">Valor</th>
-                <th className="text-right px-3 sm:px-4 py-3 font-semibold text-gray-600">Dist.</th>
-                <th className="text-right px-3 sm:px-4 py-3 font-semibold text-gray-600">Ações</th>
+                <SortHeader field="origem_nome" label="Origem" sortKey={sortKey} sortDirection={sortDirection} onSort={toggleSort} />
+                <SortHeader field="destino_nome" label="Destino" sortKey={sortKey} sortDirection={sortDirection} onSort={toggleSort} />
+                <SortHeader field="produto_nome" label="Produto" sortKey={sortKey} sortDirection={sortDirection} onSort={toggleSort} />
+                <SortHeader field="fornecedor_nome" label="Transportador" sortKey={sortKey} sortDirection={sortDirection} onSort={toggleSort} />
+                <SortHeader field="valor" label="Valor" sortKey={sortKey} sortDirection={sortDirection} onSort={toggleSort} align="right" />
+                <SortHeader field="distancia_km" label="Dist." sortKey={sortKey} sortDirection={sortDirection} onSort={toggleSort} align="right" />
+                <th className="text-right px-4 py-3 font-semibold text-gray-600">Ações</th>
               </tr>
             </thead>
             <tbody className="divide-y">
-              {filteredItems.map((item: any) => (
+              {pagination.paginate(sortedItems).map((item: any) => (
                 <tr key={item.id} className="hover:bg-gray-50 cursor-pointer" onClick={() => setViewingItem(item)}>
                   <td className="px-4 py-3 font-medium">{item.origem_nome}</td>
                   <td className="px-4 py-3">{item.destino_nome}</td>
                   <td className="px-4 py-3"><span className={`px-2 py-1 rounded-full text-xs font-medium ${item.produto_tipo === 'Grao' ? 'bg-yellow-100 text-yellow-700' : 'bg-blue-100 text-blue-700'}`}>{item.produto_nome}</span></td>
-                  <td className="px-3 sm:px-4 py-3 text-gray-600 hidden md:table-cell">{item.fornecedor_nome || 'Geral'}</td>
+                  <td className="px-4 py-3 text-gray-600">{item.fornecedor_nome || 'Geral'}</td>
                   <td className="px-4 py-3 text-right font-semibold text-green-700">{fmtCur(item.valor)} <span className="text-xs text-gray-400 font-normal">{item.unidade_preco}</span></td>
-                  <td className="px-4 py-3 text-right text-gray-600">{item.distancia_km ? `${item.distancia_km} km` : '-'}</td>
+                  <td className="px-4 py-3 text-right text-gray-600">{item.distancia_km ? `${fmtInt(item.distancia_km)} km` : '-'}</td>
                   <td className="px-4 py-3 text-right space-x-1" onClick={e => e.stopPropagation()}>
                     <button onClick={() => gerarDocumento(item)} title="Gerar documento" className="p-1.5 text-green-600 hover:bg-green-50 rounded"><FileDown className="w-4 h-4" /></button>
                     <button onClick={() => openEdit(item)} className="p-1.5 text-blue-600 hover:bg-blue-50 rounded"><Pencil className="w-4 h-4" /></button>
@@ -373,9 +380,16 @@ export default function Precos() {
                   </td>
                 </tr>
               ))}
-              {filteredItems.length === 0 && <tr><td colSpan={7} className="px-4 py-8 text-center text-gray-400">Nenhum preco cadastrado</td></tr>}
+              {sortedItems.length === 0 && <tr><td colSpan={7} className="px-4 py-8 text-center text-gray-400">Nenhum preco cadastrado</td></tr>}
             </tbody>
           </table>
+          <Pagination
+            currentPage={pagination.page}
+            totalItems={sortedItems.length}
+            pageSize={pagination.pageSize}
+            onPageChange={pagination.setPage}
+            onPageSizeChange={(s) => { pagination.setPageSize(s); pagination.resetPage() }}
+          />
         </div>
       )}
       {showForm && (
@@ -459,9 +473,9 @@ export default function Precos() {
             <Field label="Transportador" value={viewingItem.fornecedor_nome || 'Preço Geral (todos)'} />
             <Field label="Valor" value={fmtCur(viewingItem.valor)} />
             <Field label="Unidade de Preço" value={viewingItem.unidade_preco} />
-            <Field label="Distância (km)" value={viewingItem.distancia_km ? `${viewingItem.distancia_km} km` : '-'} />
-            <Field label="Vigência Início" value={viewingItem.vigencia_inicio || '-'} />
-            <Field label="Vigência Fim" value={viewingItem.vigencia_fim || '-'} />
+            <Field label="Distância (km)" value={viewingItem.distancia_km ? `${fmtInt(viewingItem.distancia_km)} km` : '-'} />
+            <Field label="Vigência Início" value={fmtData(viewingItem.vigencia_inicio) || '-'} />
+            <Field label="Vigência Fim" value={fmtData(viewingItem.vigencia_fim) || '-'} />
             <Field label="Status" value={viewingItem.ativo ? 'Ativo' : 'Inativo'} />
             <Field label="Observações" value={viewingItem.observacoes} full />
           </dl>

@@ -3,6 +3,12 @@ import { Plus, Pencil, Trash2, X, Truck, User, Minus, Check, CarFront, Loader2, 
 import toast from 'react-hot-toast'
 import { getOrdens, createOrdem, updateOrdem, deleteOrdem, getCadastros, getProdutos, getVeiculos, getPrecos, getOrdemTransportadores, addOrdemTransportador, removeOrdemTransportador, getOperacoes, createCadastro, createProduto, createPreco } from '../services/api'
 import ViewModal, { Field, Section } from '../components/ViewModal'
+import { useSort } from '../hooks/useSort'
+import SortHeader from '../components/SortHeader'
+import { fmtData, fmtDataHora, fmtInt, fmtDec } from '../utils/format'
+import Pagination, { usePagination } from '../components/Pagination'
+import ExportButtons from '../components/ExportButtons'
+import { exportToPDF, exportToExcel } from '../utils/export'
 
 const STATUS_OPTIONS = [
   { value: 'pendente', label: 'Pendente', color: 'bg-yellow-100 text-yellow-700' },
@@ -57,6 +63,7 @@ export default function Ordens() {
   const [editing, setEditing] = useState<any>(null)
   const [form, setForm] = useState(emptyForm)
   const [searchTerm, setSearchTerm] = useState('')
+  const pagination = usePagination(25)
   const [activeFilters, setActiveFilters] = useState<{id: string, field: string, value: string}[]>([])
   const [showFilterOptions, setShowFilterOptions] = useState(false)
   const [viewingItem, setViewingItem] = useState<any>(null)
@@ -444,13 +451,53 @@ export default function Ordens() {
     return true
   })
 
+  const { sortedData: sortedItems, sortKey, sortDirection, toggleSort } = useSort(filteredItems)
+
   return (
     <div>
       <div className="flex items-center justify-between mb-4 sm:mb-6 gap-2">
         <h1 className="text-xl sm:text-2xl font-bold text-gray-800">Ordens de Carregamento</h1>
-        <button onClick={openNew} className="flex items-center gap-2 bg-green-600 text-white px-3 py-2 sm:px-4 rounded-lg hover:bg-green-700 text-sm sm:text-base whitespace-nowrap">
-          <Plus className="w-4 h-4" /> <span className="hidden sm:inline">Nova</span> Ordem
-        </button>
+        <div className="flex gap-2">
+          <ExportButtons
+            onExportExcel={() => exportToExcel({
+              filename: 'ordens', title: 'Ordens de Carregamento',
+              columns: [
+                { key: 'numero_ordem_fmt', label: 'Número' },
+                { key: 'operacao_nome', label: 'Operação' },
+                { key: 'nome_ordem', label: 'Nome' },
+                { key: 'status', label: 'Status' },
+                { key: 'origem_nome', label: 'Origem' },
+                { key: 'destino_nome', label: 'Destino' },
+                { key: 'produto_nome', label: 'Produto' },
+              ],
+              data: sortedItems,
+              getValue: (item, key) => {
+                if (key === 'status') return statusInfo(item.status).label
+                return item[key] ?? '-'
+              },
+            })}
+            onExportPDF={() => exportToPDF({
+              filename: 'ordens', title: 'Ordens de Carregamento',
+              columns: [
+                { key: 'numero_ordem_fmt', label: 'Número' },
+                { key: 'operacao_nome', label: 'Operação' },
+                { key: 'nome_ordem', label: 'Nome' },
+                { key: 'status', label: 'Status' },
+                { key: 'origem_nome', label: 'Origem' },
+                { key: 'destino_nome', label: 'Destino' },
+                { key: 'produto_nome', label: 'Produto' },
+              ],
+              data: sortedItems,
+              getValue: (item, key) => {
+                if (key === 'status') return statusInfo(item.status).label
+                return item[key] ?? '-'
+              },
+            })}
+          />
+          <button onClick={openNew} className="flex items-center gap-2 bg-green-600 text-white px-3 py-2 sm:px-4 rounded-lg hover:bg-green-700 text-sm sm:text-base whitespace-nowrap">
+            <Plus className="w-4 h-4" /> <span className="hidden sm:inline">Nova</span> Ordem
+          </button>
+        </div>
       </div>
 
       <div className="mb-4 space-y-3">
@@ -515,18 +562,18 @@ export default function Ordens() {
           <table className="w-full text-sm min-w-[750px]">
             <thead className="bg-gray-50 border-b">
               <tr>
-                <th className="text-left px-4 py-3 font-semibold text-gray-600">Numero</th>
-                <th className="text-left px-4 py-3 font-semibold text-gray-600">Operacao</th>
-                <th className="text-left px-4 py-3 font-semibold text-gray-600">Nome</th>
-                <th className="text-left px-4 py-3 font-semibold text-gray-600">Status</th>
-                <th className="text-left px-4 py-3 font-semibold text-gray-600">Origem</th>
-                <th className="text-left px-4 py-3 font-semibold text-gray-600">Destino</th>
-                <th className="text-left px-4 py-3 font-semibold text-gray-600">Produto</th>
+                <SortHeader field="numero_ordem_fmt" label="Numero" sortKey={sortKey} sortDirection={sortDirection} onSort={toggleSort} />
+                <SortHeader field="operacao_nome" label="Operação" sortKey={sortKey} sortDirection={sortDirection} onSort={toggleSort} />
+                <SortHeader field="nome_ordem" label="Nome" sortKey={sortKey} sortDirection={sortDirection} onSort={toggleSort} />
+                <SortHeader field="status" label="Status" sortKey={sortKey} sortDirection={sortDirection} onSort={toggleSort} />
+                <SortHeader field="origem_nome" label="Origem" sortKey={sortKey} sortDirection={sortDirection} onSort={toggleSort} />
+                <SortHeader field="destino_nome" label="Destino" sortKey={sortKey} sortDirection={sortDirection} onSort={toggleSort} />
+                <SortHeader field="produto_nome" label="Produto" sortKey={sortKey} sortDirection={sortDirection} onSort={toggleSort} />
                 <th className="text-right px-4 py-3 font-semibold text-gray-600">Ações</th>
               </tr>
             </thead>
             <tbody className="divide-y">
-              {filteredItems.map((item: any) => {
+              {pagination.paginate(sortedItems).map((item: any) => {
                 const st = statusInfo(item.status)
                 return (
                   <tr key={item.id} className="hover:bg-gray-50 cursor-pointer" onClick={() => setViewingItem(item)}>
@@ -544,9 +591,16 @@ export default function Ordens() {
                   </tr>
                 )
               })}
-              {filteredItems.length === 0 && <tr><td colSpan={8} className="px-4 py-8 text-center text-gray-400">Nenhuma ordem encontrada</td></tr>}
+              {sortedItems.length === 0 && <tr><td colSpan={8} className="px-4 py-8 text-center text-gray-400">Nenhuma ordem encontrada</td></tr>}
             </tbody>
           </table>
+          <Pagination
+            currentPage={pagination.page}
+            totalItems={sortedItems.length}
+            pageSize={pagination.pageSize}
+            onPageChange={pagination.setPage}
+            onPageSizeChange={(s) => { pagination.setPageSize(s); pagination.resetPage() }}
+          />
         </div>
       )}
 
@@ -1007,14 +1061,14 @@ export default function Ordens() {
               <Field label="Nome da Ordem" value={viewingItem.nome_ordem} highlight />
               <Field label="Status" value={statusInfo(viewingItem.status).label} />
               <Field label="Operação" value={viewingItem.operacao_nome || '-'} />
-              <Field label="Criado em" value={new Date(viewingItem.created_at).toLocaleString('pt-BR')} />
+              <Field label="Criado em" value={fmtDataHora(viewingItem.created_at)} />
             </Section>
 
             <Section title="Origem, Destino e Produto" icon={<Target className="w-5 h-5" />}>
               <Field label="Origem" value={viewingItem.origem_nome} />
               <Field label="Destino" value={viewingItem.destino_nome} />
               <Field label="Produto" value={viewingItem.produto_nome} />
-              <Field label="Quantidade Prevista" value={viewingItem.quantidade_prevista ? `${viewingItem.quantidade_prevista} ${viewingItem.unidade}` : '-'} highlight />
+              <Field label="Quantidade Prevista" value={viewingItem.quantidade_prevista ? `${fmtDec(viewingItem.quantidade_prevista)} ${viewingItem.unidade}` : '-'} highlight />
               <Field label="Preço Vinculado" value={viewingItem.preco_id ? 'Sim' : 'Não'} />
             </Section>
 

@@ -4,6 +4,10 @@ import toast from 'react-hot-toast'
 import { getCadastros, createCadastro, updateCadastro, deleteCadastro, createVeiculo, getVeiculos, getTiposCaminhao } from '../services/api'
 import { APIProvider, Map, AdvancedMarker, useMap } from '@vis.gl/react-google-maps'
 import ViewModal, { Field } from '../components/ViewModal'
+import { useSort } from '../hooks/useSort'
+import SortHeader from '../components/SortHeader'
+import { fmtInt } from '../utils/format'
+import Pagination, { usePagination } from '../components/Pagination'
 
 const GOOGLE_MAPS_API_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY || ''
 const DEFAULT_CENTER = { lat: -15.7801, lng: -47.9292 }
@@ -88,7 +92,9 @@ function MapCenterUpdater({ cidade, uf }: { cidade: string; uf: string }) {
 export default function Cadastros() {
   const [items, setItems] = useState<Cadastro[]>([])
   const [loading, setLoading] = useState(true)
+  const [searchTerm, setSearchTerm] = useState('')
   const [showForm, setShowForm] = useState(false)
+  const pagination = usePagination(25)
   const [editing, setEditing] = useState<Cadastro | null>(null)
   const [form, setForm] = useState(emptyForm)
   const [busca, setBusca] = useState('')
@@ -333,6 +339,8 @@ export default function Cadastros() {
       placasPorCadastro(i.id).some(p => p.toLowerCase().includes(term))
   })
 
+  const { sortedData: sortedFiltered, sortKey, sortDirection, toggleSort } = useSort(filtered)
+
   const ufsDisponiveis = [...new Set(items.map(i => i.uf))].sort()
 
   const tipoColors: Record<string, string> = {
@@ -422,17 +430,17 @@ export default function Cadastros() {
           <table className="w-full text-sm min-w-[700px]">
             <thead className="bg-gray-50 border-b">
               <tr>
-                <th className="text-left px-4 py-3 font-semibold text-gray-600">Nome</th>
-                <th className="text-left px-4 py-3 font-semibold text-gray-600">CPF/CNPJ</th>
+                <SortHeader field="nome" label="Nome" sortKey={sortKey} sortDirection={sortDirection} onSort={toggleSort} />
+                <SortHeader field="cpf_cnpj" label="CPF/CNPJ" sortKey={sortKey} sortDirection={sortDirection} onSort={toggleSort} />
                 <th className="text-left px-4 py-3 font-semibold text-gray-600">Placa</th>
-                <th className="text-left px-4 py-3 font-semibold text-gray-600">Cidade/UF</th>
+                <SortHeader field="cidade" label="Cidade/UF" sortKey={sortKey} sortDirection={sortDirection} onSort={toggleSort} />
                 <th className="text-left px-4 py-3 font-semibold text-gray-600">Tipos</th>
-                <th className="text-left px-4 py-3 font-semibold text-gray-600">Telefone</th>
+                <SortHeader field="telefone1" label="Telefone" sortKey={sortKey} sortDirection={sortDirection} onSort={toggleSort} />
                 <th className="text-right px-4 py-3 font-semibold text-gray-600">Ações</th>
               </tr>
             </thead>
             <tbody className="divide-y">
-              {filtered.map(item => {
+              {pagination.paginate(sortedFiltered).map(item => {
                 const placas = placasPorCadastro(item.id)
                 return (
                 <tr key={item.id} className="hover:bg-gray-50 cursor-pointer" onClick={() => setViewingItem(item)}>
@@ -462,9 +470,16 @@ export default function Cadastros() {
                 </tr>
                 )
               })}
-              {filtered.length === 0 && <tr><td colSpan={7} className="px-4 py-8 text-center text-gray-400">Nenhum cadastro encontrado</td></tr>}
+              {sortedFiltered.length === 0 && <tr><td colSpan={7} className="px-4 py-8 text-center text-gray-400">Nenhum cadastro encontrado</td></tr>}
             </tbody>
           </table>
+          <Pagination
+            currentPage={pagination.page}
+            totalItems={sortedFiltered.length}
+            pageSize={pagination.pageSize}
+            onPageChange={pagination.setPage}
+            onPageSizeChange={(s) => { pagination.setPageSize(s); pagination.resetPage() }}
+          />
         </div>
       )}
 
@@ -699,7 +714,7 @@ export default function Cadastros() {
                           <label className="block text-xs font-medium text-gray-700 mb-1">Tipo Caminhao *</label>
                           <select value={veiculoForm.tipo_caminhao} onChange={e => onVeiculoTipoChange(e.target.value)}
                             className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-transparent">
-                            {tiposCaminhao.map((t: any) => <option key={t.nome} value={t.nome}>{t.nome} ({t.eixos} eixos - {t.peso_pauta_kg.toLocaleString('pt-BR')} kg)</option>)}
+                            {tiposCaminhao.map((t: any) => <option key={t.nome} value={t.nome}>{t.nome} ({t.eixos} eixos - {fmtInt(t.peso_pauta_kg)} kg)</option>)}
                           </select>
                         </div>
                       </div>

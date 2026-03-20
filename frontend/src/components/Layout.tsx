@@ -94,9 +94,8 @@ export default function Layout({ children }: { children: ReactNode }) {
           <div className="border-t border-green-700 my-2" />
           {adminItems.map(item => <NavLink key={item.path} {...item} />)}
         </nav>
-        <div className="p-4 border-t border-green-700 text-xs text-green-300">
-          <p>iAgru Ecossistema</p>
-          <p>v1.0.0</p>
+        <div className="p-3 border-t border-green-700">
+          <p className="text-xs text-green-400 px-1">iAgru v1.0.0</p>
         </div>
       </aside>
 
