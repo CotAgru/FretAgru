@@ -29,63 +29,57 @@ export default async function handler(req, res) {
   // Sanitizar token: remover espaços, quebras de linha, tabs (comum ao copiar de email)
   const token = rawToken.replace(/[\s\r\n\t]/g, '')
 
-  const AEGRO_BASE = 'https://api.aegro.com.br/api/v1'
+  // URL e header conforme documentação oficial: https://app.aegro.com.br/docs/public-api/
+  const AEGRO_BASE = 'https://app.aegro.com.br/pub/v1'
 
-  // Tentar diferentes formatos de autenticação
-  const authHeaders = [
-    { 'Authorization': `Bearer ${token}` },
-    { 'Authorization': token },
-    { 'x-api-key': token },
-  ]
+  // Determinar método HTTP (POST para endpoints /filter, GET para os demais)
+  const method = endpoint.endsWith('/filter') ? 'POST' : 'GET'
+  const { body: requestBody } = req.body || {}
 
-  let lastStatus = 0
-  let lastDetail = ''
-
-  for (const authHeader of authHeaders) {
-    try {
-      const response = await fetch(`${AEGRO_BASE}${endpoint}`, {
-        method: 'GET',
-        headers: {
-          ...authHeader,
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-        },
-      })
-
-      lastStatus = response.status
-      const text = await response.text()
-      lastDetail = text
-
-      if (response.ok) {
-        let data
-        try {
-          data = JSON.parse(text)
-        } catch {
-          data = text
-        }
-        return res.status(200).json(data)
-      }
-
-      // Se não for 401/403, retornar o erro (não tentar outro formato)
-      if (response.status !== 401 && response.status !== 403) {
-        return res.status(response.status).json({
-          error: `Aegro API erro ${response.status}`,
-          detail: text,
-        })
-      }
-    } catch (err) {
-      lastDetail = err.message
+  try {
+    const fetchOptions = {
+      method,
+      headers: {
+        'Aegro-Public-API-Key': token,
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+      },
     }
-  }
 
-  return res.status(lastStatus || 500).json({
-    error: `Aegro API erro ${lastStatus}: autenticação falhou com todos os formatos`,
-    detail: lastDetail,
-    hint: 'Verifique se o token está correto e não expirou. O token deve começar com aegro_',
-    debug: {
-      url: `${AEGRO_BASE}${endpoint}`,
-      tokenPrefix: token.substring(0, 15) + '...',
-      tokenLength: token.length,
-    },
-  })
+    // Adicionar body para requisições POST (filtros)
+    if (method === 'POST' && requestBody) {
+      fetchOptions.body = JSON.stringify(requestBody)
+    }
+
+    const response = await fetch(`${AEGRO_BASE}${endpoint}`, fetchOptions)
+
+    const text = await response.text()
+
+    if (!response.ok) {
+      return res.status(response.status).json({
+        error: `Aegro API erro ${response.status}`,
+        detail: text,
+        url: `${AEGRO_BASE}${endpoint}`,
+      })
+    }
+
+    // 204 = No Content
+    if (response.status === 204 || !text) {
+      return res.status(200).json([])
+    }
+
+    let data
+    try {
+      data = JSON.parse(text)
+    } catch {
+      data = text
+    }
+
+    return res.status(200).json(data)
+  } catch (err) {
+    return res.status(500).json({
+      error: 'Erro ao conectar com Aegro API',
+      detail: err.message,
+    })
+  }
 }

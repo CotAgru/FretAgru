@@ -1,49 +1,71 @@
 /**
- * Serviço de integração com a API do Aegro
- * Usa proxy Vercel serverless (/api/aegro-proxy) para contornar CORS
- * Documentação Aegro: https://api.aegro.com.br
+ * Serviço de integração com a API Pública do Aegro
+ * Documentação: https://app.aegro.com.br/docs/public-api/
+ * Base URL: https://app.aegro.com.br/pub/v1
+ * Auth Header: Aegro-Public-API-Key
+ * Proxy: /api/aegro-proxy (Vercel Serverless Function)
  */
 
-async function aegroFetch(endpoint: string, token: string) {
+// Chamada via proxy — contorna CORS
+async function aegroFetch(endpoint: string, token: string, body?: any) {
   const resp = await fetch('/api/aegro-proxy', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ endpoint, token }),
+    body: JSON.stringify({ endpoint, token, body }),
   })
   if (!resp.ok) {
     const err = await resp.json().catch(() => ({ error: resp.statusText }))
-    const parts = [err?.error, err?.hint, err?.debug ? `Token: ${err.debug.tokenPrefix} (${err.debug.tokenLength} chars)` : ''].filter(Boolean)
-    throw new Error(parts.join(' | ') || `Erro ${resp.status}`)
+    throw new Error(err?.error || err?.detail || `Erro ${resp.status}`)
   }
   return resp.json()
 }
 
-// Testar conexão — busca as farms vinculadas ao token
+// === CONEXÃO ===
+
+// Testar conexão — busca a propriedade (farm) vinculada ao token
 export async function aegroTestConnection(token: string): Promise<{ success: boolean; farms: any[]; error?: string }> {
   try {
-    const farms = await aegroFetch('/farms', token)
-    return { success: true, farms: Array.isArray(farms) ? farms : [] }
+    const farm = await aegroFetch('/farms', token)
+    // A API retorna um objeto (a farm vinculada ao token) ou array
+    const farms = Array.isArray(farm) ? farm : [farm]
+    return { success: true, farms: farms.filter(Boolean) }
   } catch (err: any) {
     return { success: false, farms: [], error: err.message }
   }
 }
 
-// Buscar fazendas
-export async function aegroGetFarms(token: string): Promise<any[]> {
+// === PROPRIEDADE ===
+
+export async function aegroGetFarm(token: string): Promise<any> {
   return aegroFetch('/farms', token)
 }
 
-// Buscar safras (crops) de uma fazenda
-export async function aegroGetCrops(token: string, farmId: string): Promise<any[]> {
-  return aegroFetch(`/farms/${farmId}/crops`, token)
+// === SAFRAS (Crops) ===
+
+export async function aegroGetCrops(token: string, page = 1, size = 100): Promise<any> {
+  return aegroFetch('/crops/filter', token, { page, size })
 }
 
-// Buscar elementos (produtos/insumos) — via catálogo
-export async function aegroGetElements(token: string, catalogId: string): Promise<any[]> {
-  return aegroFetch(`/catalogs/${catalogId}/elements`, token)
+// === TALHÕES ===
+
+export async function aegroGetGlebes(token: string, page = 1, size = 100): Promise<any> {
+  return aegroFetch('/glebes/filter', token, { page, size })
 }
 
-// Buscar catálogos de uma fazenda
-export async function aegroGetCatalogs(token: string, farmId: string): Promise<any[]> {
-  return aegroFetch(`/farms/${farmId}/catalogs`, token)
+// === CATÁLOGOS ===
+
+export async function aegroGetCatalogs(token: string, page = 1, size = 100): Promise<any> {
+  return aegroFetch('/catalogs/filter', token, { page, size })
+}
+
+// === ELEMENTOS (Produtos/Insumos) ===
+
+export async function aegroGetElements(token: string, page = 1, size = 100): Promise<any> {
+  return aegroFetch('/elements/filter', token, { page, size })
+}
+
+// === EMPRESAS (Fornecedores) ===
+
+export async function aegroGetCompanies(token: string, page = 1, size = 100): Promise<any> {
+  return aegroFetch('/companies/filter', token, { page, size })
 }

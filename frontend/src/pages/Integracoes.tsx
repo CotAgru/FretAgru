@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link2, Loader2, CheckCircle2, XCircle, RefreshCw, Trash2, Eye, EyeOff } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { getIntegracaoByProvedor, upsertIntegracao, deleteIntegracao } from '../services/api'
-import { aegroTestConnection, aegroGetFarms } from '../services/aegro'
+import { aegroTestConnection } from '../services/aegro'
 import { fmtData } from '../utils/format'
 
 const FARM_ID_PADRAO = '61af6824b4d7196ebc0076f0'
@@ -49,14 +49,16 @@ export default function Integracoes() {
 
       setFarms(result.farms)
 
-      // Buscar o farm pelo ID ou usar o primeiro
-      let selectedFarm = result.farms.find((f: any) => f._id === farmId || f.id === farmId)
+      // Aegro retorna key no formato "farm::id" e campo "name"
+      const extractId = (f: any) => f?.key?.replace('farm::', '') || f?._id || f?.id || ''
+      let selectedFarm = result.farms.find((f: any) => extractId(f) === farmId || f?.key === `farm::${farmId}`)
       if (!selectedFarm && result.farms.length > 0) {
         selectedFarm = result.farms[0]
       }
 
       const nome = selectedFarm?.name || selectedFarm?.nome || 'Fazenda conectada'
-      const fid = selectedFarm?._id || selectedFarm?.id || farmId
+      const fid = extractId(selectedFarm) || farmId
+      const farmKey = selectedFarm?.key || `farm::${fid}`
 
       const saved = await upsertIntegracao('aegro', {
         token: token.trim(),
@@ -64,7 +66,7 @@ export default function Integracoes() {
         farm_nome: nome,
         status: 'conectado',
         ultimo_sync: new Date().toISOString(),
-        config: { farms: result.farms.map((f: any) => ({ id: f._id || f.id, name: f.name || f.nome })) },
+        config: { farmKey, farms: result.farms.map((f: any) => ({ key: f.key, id: extractId(f), name: f.name || f.nome })) },
       })
 
       setAegro(saved)
