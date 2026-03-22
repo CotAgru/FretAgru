@@ -12,7 +12,8 @@ async function aegroFetch(endpoint: string, token: string) {
   })
   if (!resp.ok) {
     const err = await resp.json().catch(() => ({ error: resp.statusText }))
-    throw new Error(err?.error || err?.detail || `Erro ${resp.status}`)
+    const parts = [err?.error, err?.hint, err?.debug ? `Token: ${err.debug.tokenPrefix} (${err.debug.tokenLength} chars)` : ''].filter(Boolean)
+    throw new Error(parts.join(' | ') || `Erro ${resp.status}`)
   }
   return resp.json()
 }
