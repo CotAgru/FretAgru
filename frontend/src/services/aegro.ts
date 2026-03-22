@@ -7,11 +7,12 @@
  */
 
 // Chamada via proxy — contorna CORS
-async function aegroFetch(endpoint: string, token: string, body?: any) {
+// method: método HTTP explícito (POST, PUT, GET). Se omitido, o proxy infere.
+async function aegroFetch(endpoint: string, token: string, body?: any, method?: string) {
   const resp = await fetch('/api/aegro-proxy', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ endpoint, token, body }),
+    body: JSON.stringify({ endpoint, token, body, method }),
   })
   if (!resp.ok) {
     const err = await resp.json().catch(() => ({ error: resp.statusText }))
@@ -68,4 +69,16 @@ export async function aegroGetElements(token: string, page = 1, size = 100): Pro
 
 export async function aegroGetCompanies(token: string, page = 1, size = 100): Promise<any> {
   return aegroFetch('/companies/filter', token, { page, size })
+}
+
+export async function aegroGetCompanyByKey(token: string, companyKey: string): Promise<any> {
+  return aegroFetch(`/companies/${companyKey}`, token, undefined, 'GET')
+}
+
+export async function aegroCreateCompany(token: string, data: any): Promise<any> {
+  return aegroFetch('/companies', token, data, 'POST')
+}
+
+export async function aegroUpdateCompany(token: string, companyKey: string, data: any): Promise<any> {
+  return aegroFetch(`/companies/${companyKey}`, token, data, 'PUT')
 }

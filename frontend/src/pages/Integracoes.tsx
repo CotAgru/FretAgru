@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react'
-import { Link2, Loader2, CheckCircle2, XCircle, RefreshCw, Trash2, Eye, EyeOff, X, ArrowRight, Check, Filter, BarChart3 } from 'lucide-react'
+import { Link2, Loader2, CheckCircle2, XCircle, RefreshCw, Trash2, Eye, EyeOff, X, ArrowRight, Check, Filter, BarChart3, ArrowUpDown, Upload, Download, Link as LinkIcon, Search, Building2 } from 'lucide-react'
 import toast from 'react-hot-toast'
-import { getIntegracaoByProvedor, upsertIntegracao, deleteIntegracao, getCulturas, createCultura, getTiposSafra, createTipoSafra, getAnosSafra, createAnoSafra, upsertSafraFromAegro, getImportedAegroSafras } from '../services/api'
-import { aegroTestConnection, aegroGetCrops } from '../services/aegro'
+import { getIntegracaoByProvedor, upsertIntegracao, deleteIntegracao, getCulturas, createCultura, getTiposSafra, createTipoSafra, getAnosSafra, createAnoSafra, upsertSafraFromAegro, getImportedAegroSafras, getCadastros, getImportedAegroCadastros, upsertCadastroAegroKey, createCadastroFromAegro } from '../services/api'
+import { aegroTestConnection, aegroGetCrops, aegroGetCompanies, aegroCreateCompany } from '../services/aegro'
 import { fmtData } from '../utils/format'
 
 const FARM_ID_PADRAO = '61af6824b4d7196ebc0076f0'
@@ -14,6 +14,35 @@ const AEGRO_TYPE_MAP: Record<string, string> = {
   rice: 'Arroz', oat: 'Aveia', citrus: 'Citros', barley: 'Cevada', sunflower: 'Girassol',
   peanut: 'Amendoim', potato: 'Batata', tobacco: 'Tabaco', millet: 'Milheto',
   other: 'Geral', grass: 'Pastagem', eucalyptus: 'Eucalipto',
+}
+
+// Sync Cadastros
+type SyncStatus = 'linked' | 'only_iagru' | 'only_aegro' | 'match_suggestion'
+interface CompanySync {
+  // Dados Aegro
+  aegroKey: string | null
+  aegroName: string | null
+  aegroTradeName: string | null
+  aegroCpfCnpj: string | null
+  aegroPhone: string | null
+  aegroState: string | null
+  aegroCity: string | null
+  aegroRaw: any // dados brutos do Aegro para debug/referência
+  // Dados iAgru
+  iagruId: string | null
+  iagruNome: string | null
+  iagruNomeFantasia: string | null
+  iagruCpfCnpj: string | null
+  iagruTelefone: string | null
+  iagruUf: string | null
+  iagruCidade: string | null
+  iagruTipos: string[]
+  // Status
+  status: SyncStatus
+  matchField: string | null // campo que gerou o match ('cpf_cnpj' | 'nome')
+  processing: boolean
+  done: boolean
+  error: string | null
 }
 
 interface CropMapping {
@@ -58,6 +87,13 @@ export default function Integracoes() {
   const [filterNome, setFilterNome] = useState('')
   const [filterType, setFilterType] = useState('')
   const [filterAnoSafra, setFilterAnoSafra] = useState('')
+
+  // Modal Sync Cadastros
+  const [showSyncCadModal, setShowSyncCadModal] = useState(false)
+  const [loadingSyncCad, setLoadingSyncCad] = useState(false)
+  const [companySyncs, setCompanySyncs] = useState<CompanySync[]>([])
+  const [syncCadFilter, setSyncCadFilter] = useState<'' | 'linked' | 'only_iagru' | 'only_aegro' | 'match_suggestion'>('')
+  const [syncCadSearch, setSyncCadSearch] = useState('')
 
   // Stats de sincronização (dashboard)
   const [syncStats, setSyncStats] = useState<{
@@ -469,6 +505,266 @@ export default function Integracoes() {
     setSavingImport(false)
   }
 
+  // === SYNC CADASTROS ===
+  const normCnpj = (v: string | null | undefined) => (v || '').replace(/\D/g, '')
+  const normName = (v: string | null | undefined) => (v || '').toLowerCase().trim().replace(/\s+/g, ' ')
+
+  const handleOpenSyncCadastros = async () => {
+    setShowSyncCadModal(true)
+    setLoadingSyncCad(true)
+    setSyncCadFilter('')
+    setSyncCadSearch('')
+    try {
+      // Buscar dados dos dois lados em paralelo
+      const [cadastrosData, companiesData] = await Promise.all([
+        getCadastros(),
+        aegroGetCompanies(token.trim(), 1, 500),
+      ])
+      const cadastros: any[] = cadastrosData || []
+      const companies: any[] = companiesData?.items || (Array.isArray(companiesData) ? companiesData : [])
+
+      // Mapa por CPF/CNPJ (normalizado, sem pontuação)
+      const cadByCnpj = new Map<string, any>()
+      const cadByName = new Map<string, any>()
+      for (const c of cadastros) {
+        const cnpj = normCnpj(c.cpf_cnpj)
+        if (cnpj.length >= 11) cadByCnpj.set(cnpj, c)
+        cadByName.set(normName(c.nome), c)
+        if (c.nome_fantasia) cadByName.set(normName(c.nome_fantasia), c)
+      }
+
+      const usedCadIds = new Set<string>()
+      const usedAegroKeys = new Set<string>()
+      const syncs: CompanySync[] = []
+
+      // 1. Cadastros já vinculados (têm aegro_company_key)
+      for (const cad of cadastros) {
+        if (cad.aegro_company_key) {
+          const aegroMatch = companies.find((co: any) => co.key === cad.aegro_company_key)
+          syncs.push({
+            aegroKey: cad.aegro_company_key,
+            aegroName: aegroMatch?.name || null,
+            aegroTradeName: aegroMatch?.tradeName || null,
+            aegroCpfCnpj: aegroMatch?.cpfCnpj || null,
+            aegroPhone: aegroMatch?.phone || null,
+            aegroState: aegroMatch?.state || null,
+            aegroCity: aegroMatch?.city || null,
+            aegroRaw: aegroMatch || null,
+            iagruId: cad.id,
+            iagruNome: cad.nome,
+            iagruNomeFantasia: cad.nome_fantasia,
+            iagruCpfCnpj: cad.cpf_cnpj,
+            iagruTelefone: cad.telefone1,
+            iagruUf: cad.uf,
+            iagruCidade: cad.cidade,
+            iagruTipos: cad.tipos || [],
+            status: 'linked',
+            matchField: 'aegro_company_key',
+            processing: false, done: false, error: null,
+          })
+          usedCadIds.add(cad.id)
+          if (aegroMatch) usedAegroKeys.add(aegroMatch.key)
+        }
+      }
+
+      // 2. Tentar matching por CPF/CNPJ e nome para os não vinculados
+      for (const co of companies) {
+        if (usedAegroKeys.has(co.key)) continue
+        const cnpj = normCnpj(co.cpfCnpj)
+        let matchedCad: any = null
+        let matchField = ''
+
+        if (cnpj.length >= 11 && cadByCnpj.has(cnpj)) {
+          matchedCad = cadByCnpj.get(cnpj)
+          matchField = 'cpf_cnpj'
+        }
+        if (!matchedCad) {
+          // Tentar por nome
+          const nameMatch = cadByName.get(normName(co.name)) || cadByName.get(normName(co.tradeName))
+          if (nameMatch && !usedCadIds.has(nameMatch.id)) {
+            matchedCad = nameMatch
+            matchField = 'nome'
+          }
+        }
+
+        if (matchedCad && !usedCadIds.has(matchedCad.id)) {
+          syncs.push({
+            aegroKey: co.key,
+            aegroName: co.name,
+            aegroTradeName: co.tradeName || null,
+            aegroCpfCnpj: co.cpfCnpj || null,
+            aegroPhone: co.phone || null,
+            aegroState: co.state || null,
+            aegroCity: co.city || null,
+            aegroRaw: co,
+            iagruId: matchedCad.id,
+            iagruNome: matchedCad.nome,
+            iagruNomeFantasia: matchedCad.nome_fantasia,
+            iagruCpfCnpj: matchedCad.cpf_cnpj,
+            iagruTelefone: matchedCad.telefone1,
+            iagruUf: matchedCad.uf,
+            iagruCidade: matchedCad.cidade,
+            iagruTipos: matchedCad.tipos || [],
+            status: 'match_suggestion',
+            matchField,
+            processing: false, done: false, error: null,
+          })
+          usedCadIds.add(matchedCad.id)
+          usedAegroKeys.add(co.key)
+        } else {
+          // Apenas Aegro
+          syncs.push({
+            aegroKey: co.key,
+            aegroName: co.name,
+            aegroTradeName: co.tradeName || null,
+            aegroCpfCnpj: co.cpfCnpj || null,
+            aegroPhone: co.phone || null,
+            aegroState: co.state || null,
+            aegroCity: co.city || null,
+            aegroRaw: co,
+            iagruId: null, iagruNome: null, iagruNomeFantasia: null,
+            iagruCpfCnpj: null, iagruTelefone: null, iagruUf: null, iagruCidade: null, iagruTipos: [],
+            status: 'only_aegro',
+            matchField: null,
+            processing: false, done: false, error: null,
+          })
+          usedAegroKeys.add(co.key)
+        }
+      }
+
+      // 3. Cadastros iAgru sem match (não vinculados, não matcharam)
+      for (const cad of cadastros) {
+        if (usedCadIds.has(cad.id)) continue
+        syncs.push({
+          aegroKey: null, aegroName: null, aegroTradeName: null,
+          aegroCpfCnpj: null, aegroPhone: null, aegroState: null, aegroCity: null, aegroRaw: null,
+          iagruId: cad.id,
+          iagruNome: cad.nome,
+          iagruNomeFantasia: cad.nome_fantasia,
+          iagruCpfCnpj: cad.cpf_cnpj,
+          iagruTelefone: cad.telefone1,
+          iagruUf: cad.uf,
+          iagruCidade: cad.cidade,
+          iagruTipos: cad.tipos || [],
+          status: 'only_iagru',
+          matchField: null,
+          processing: false, done: false, error: null,
+        })
+      }
+
+      // Ordenar: sugestões primeiro, depois only_iagru, only_aegro, linked por último
+      const statusOrder: Record<SyncStatus, number> = { match_suggestion: 0, only_iagru: 1, only_aegro: 2, linked: 3 }
+      syncs.sort((a, b) => statusOrder[a.status] - statusOrder[b.status] || (a.iagruNome || a.aegroName || '').localeCompare(b.iagruNome || b.aegroName || ''))
+
+      setCompanySyncs(syncs)
+    } catch (err: any) {
+      toast.error('Erro ao buscar cadastros: ' + (err?.message || ''))
+      setShowSyncCadModal(false)
+    }
+    setLoadingSyncCad(false)
+  }
+
+  // Ação: vincular cadastro iAgru com company Aegro (salvar aegro_company_key)
+  const handleLinkCadastro = async (idx: number) => {
+    const s = companySyncs[idx]
+    if (!s.iagruId || !s.aegroKey) return
+    setCompanySyncs(prev => prev.map((item, i) => i === idx ? { ...item, processing: true } : item))
+    try {
+      await upsertCadastroAegroKey(s.iagruId, s.aegroKey)
+      setCompanySyncs(prev => prev.map((item, i) => i === idx ? { ...item, status: 'linked', processing: false, done: true, matchField: item.matchField || 'manual' } : item))
+      toast.success(`Vinculado: ${s.iagruNome}`)
+    } catch (err: any) {
+      setCompanySyncs(prev => prev.map((item, i) => i === idx ? { ...item, processing: false, error: err?.message || 'Erro' } : item))
+      toast.error('Erro ao vincular: ' + (err?.message || ''))
+    }
+  }
+
+  // Ação: enviar cadastro iAgru para o Aegro (POST /companies)
+  const handleSendToAegro = async (idx: number) => {
+    const s = companySyncs[idx]
+    if (!s.iagruId) return
+    setCompanySyncs(prev => prev.map((item, i) => i === idx ? { ...item, processing: true } : item))
+    try {
+      const payload: any = {
+        name: s.iagruNome || '',
+        tradeName: s.iagruNomeFantasia || undefined,
+        cpfCnpj: s.iagruCpfCnpj || undefined,
+        phone: s.iagruTelefone || undefined,
+        state: s.iagruUf || undefined,
+        city: s.iagruCidade || undefined,
+      }
+      const result = await aegroCreateCompany(token.trim(), payload)
+      const newKey = result?.key || result?.companyKey || ''
+      if (newKey) {
+        await upsertCadastroAegroKey(s.iagruId, newKey)
+        setCompanySyncs(prev => prev.map((item, i) => i === idx ? {
+          ...item, aegroKey: newKey, aegroName: s.iagruNome, status: 'linked', processing: false, done: true, matchField: 'enviado',
+        } : item))
+        toast.success(`Enviado ao Aegro: ${s.iagruNome} → key: ${newKey}`)
+      } else {
+        throw new Error('Aegro não retornou company key')
+      }
+    } catch (err: any) {
+      setCompanySyncs(prev => prev.map((item, i) => i === idx ? { ...item, processing: false, error: err?.message || 'Erro' } : item))
+      toast.error('Erro ao enviar: ' + (err?.message || ''))
+    }
+  }
+
+  // Ação: importar company do Aegro para o iAgru (criar cadastro)
+  const handleImportFromAegro = async (idx: number) => {
+    const s = companySyncs[idx]
+    if (!s.aegroKey) return
+    setCompanySyncs(prev => prev.map((item, i) => i === idx ? { ...item, processing: true } : item))
+    try {
+      const payload = {
+        nome: s.aegroName || '',
+        nome_fantasia: s.aegroTradeName || null,
+        cpf_cnpj: s.aegroCpfCnpj || null,
+        telefone1: s.aegroPhone || null,
+        uf: s.aegroState || 'GO',
+        cidade: s.aegroCity || '',
+        tipos: ['Fornecedor'],
+        ativo: true,
+        aegro_company_key: s.aegroKey,
+      }
+      const created = await createCadastroFromAegro(payload)
+      setCompanySyncs(prev => prev.map((item, i) => i === idx ? {
+        ...item,
+        iagruId: created.id,
+        iagruNome: created.nome,
+        iagruNomeFantasia: created.nome_fantasia,
+        iagruCpfCnpj: created.cpf_cnpj,
+        iagruTelefone: created.telefone1,
+        iagruUf: created.uf,
+        iagruCidade: created.cidade,
+        iagruTipos: created.tipos || [],
+        status: 'linked', processing: false, done: true, matchField: 'importado',
+      } : item))
+      toast.success(`Importado do Aegro: ${s.aegroName}`)
+    } catch (err: any) {
+      setCompanySyncs(prev => prev.map((item, i) => i === idx ? { ...item, processing: false, error: err?.message || 'Erro' } : item))
+      toast.error('Erro ao importar: ' + (err?.message || ''))
+    }
+  }
+
+  // Filtro do modal sync cadastros
+  const filteredSyncs = companySyncs.filter(s => {
+    if (syncCadFilter && s.status !== syncCadFilter) return false
+    if (syncCadSearch) {
+      const term = syncCadSearch.toLowerCase()
+      const haystack = [s.iagruNome, s.iagruNomeFantasia, s.iagruCpfCnpj, s.aegroName, s.aegroTradeName, s.aegroCpfCnpj].filter(Boolean).join(' ').toLowerCase()
+      if (!haystack.includes(term)) return false
+    }
+    return true
+  })
+
+  const syncCadCounts = {
+    linked: companySyncs.filter(s => s.status === 'linked').length,
+    match: companySyncs.filter(s => s.status === 'match_suggestion').length,
+    onlyIagru: companySyncs.filter(s => s.status === 'only_iagru').length,
+    onlyAegro: companySyncs.filter(s => s.status === 'only_aegro').length,
+  }
+
   const isConnected = aegro?.status === 'conectado'
 
   if (loading) return <div className="flex items-center justify-center py-20"><Loader2 className="w-8 h-8 animate-spin text-green-600" /><span className="ml-3 text-gray-500">Carregando...</span></div>
@@ -640,8 +936,9 @@ export default function Integracoes() {
                 <button disabled className="px-4 py-2 border border-green-300 text-green-700 rounded-lg text-sm font-medium bg-green-50 opacity-60 cursor-not-allowed">
                   Importar Produtos (elements)
                 </button>
-                <button disabled className="px-4 py-2 border border-green-300 text-green-700 rounded-lg text-sm font-medium bg-green-50 opacity-60 cursor-not-allowed">
-                  Sync Cadastros
+                <button onClick={handleOpenSyncCadastros} disabled={loadingSyncCad}
+                  className="px-4 py-2 border border-green-300 text-green-700 rounded-lg text-sm font-medium bg-green-50 hover:bg-green-100 transition-colors disabled:opacity-60">
+                  {loadingSyncCad ? <span className="flex items-center gap-2"><Loader2 className="w-4 h-4 animate-spin" /> Carregando...</span> : <span className="flex items-center gap-2"><Building2 className="w-4 h-4" /> Sync Cadastros</span>}
                 </button>
               </div>
               {importResult && (
@@ -669,6 +966,167 @@ export default function Integracoes() {
       <p className="text-xs text-gray-400 mt-6 max-w-2xl">
         Mais integrações em breve. Tem sugestão? Fale conosco em <a href="mailto:contato@cotagru.com.br" className="text-green-600 hover:underline">contato@cotagru.com.br</a>
       </p>
+
+      {/* ========== MODAL MAPEAMENTO DE/PARA ========== */}
+      {/* ========== MODAL SYNC CADASTROS ========== */}
+      {showSyncCadModal && (
+        <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/40 overflow-y-auto py-2 px-2">
+          <div className="bg-white rounded-xl shadow-2xl w-full max-w-[95vw] xl:max-w-6xl my-2 flex flex-col max-h-[96vh]">
+            {/* Header */}
+            <div className="flex items-center justify-between p-4 border-b shrink-0">
+              <div>
+                <h2 className="text-lg font-bold text-gray-800 flex items-center gap-2"><Building2 className="w-5 h-5 text-green-600" /> Sync Cadastros — iAgru ↔ Aegro</h2>
+                <p className="text-sm text-gray-500 mt-0.5">Vincule, envie ou importe cadastros entre os dois sistemas</p>
+              </div>
+              <button onClick={() => setShowSyncCadModal(false)} className="p-2 hover:bg-gray-100 rounded-lg"><X className="w-5 h-5 text-gray-500" /></button>
+            </div>
+
+            {loadingSyncCad ? (
+              <div className="flex items-center justify-center py-20">
+                <Loader2 className="w-8 h-8 animate-spin text-green-600" />
+                <span className="ml-3 text-gray-500">Buscando cadastros do iAgru e Aegro...</span>
+              </div>
+            ) : (
+              <>
+                {/* Stats mini-cards + filtros */}
+                <div className="p-3 bg-gray-50 border-b shrink-0 space-y-3">
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                    <button onClick={() => setSyncCadFilter(syncCadFilter === 'match_suggestion' ? '' : 'match_suggestion')}
+                      className={`rounded-lg p-2 text-center border transition-colors ${syncCadFilter === 'match_suggestion' ? 'bg-purple-100 border-purple-400 ring-2 ring-purple-300' : 'bg-purple-50 border-purple-200 hover:bg-purple-100'}`}>
+                      <p className="text-lg font-bold text-purple-700">{syncCadCounts.match}</p>
+                      <p className="text-[10px] text-purple-600 font-medium uppercase">Sugestões</p>
+                    </button>
+                    <button onClick={() => setSyncCadFilter(syncCadFilter === 'only_iagru' ? '' : 'only_iagru')}
+                      className={`rounded-lg p-2 text-center border transition-colors ${syncCadFilter === 'only_iagru' ? 'bg-orange-100 border-orange-400 ring-2 ring-orange-300' : 'bg-orange-50 border-orange-200 hover:bg-orange-100'}`}>
+                      <p className="text-lg font-bold text-orange-700">{syncCadCounts.onlyIagru}</p>
+                      <p className="text-[10px] text-orange-600 font-medium uppercase">Apenas iAgru</p>
+                    </button>
+                    <button onClick={() => setSyncCadFilter(syncCadFilter === 'only_aegro' ? '' : 'only_aegro')}
+                      className={`rounded-lg p-2 text-center border transition-colors ${syncCadFilter === 'only_aegro' ? 'bg-blue-100 border-blue-400 ring-2 ring-blue-300' : 'bg-blue-50 border-blue-200 hover:bg-blue-100'}`}>
+                      <p className="text-lg font-bold text-blue-700">{syncCadCounts.onlyAegro}</p>
+                      <p className="text-[10px] text-blue-600 font-medium uppercase">Apenas Aegro</p>
+                    </button>
+                    <button onClick={() => setSyncCadFilter(syncCadFilter === 'linked' ? '' : 'linked')}
+                      className={`rounded-lg p-2 text-center border transition-colors ${syncCadFilter === 'linked' ? 'bg-green-100 border-green-400 ring-2 ring-green-300' : 'bg-green-50 border-green-200 hover:bg-green-100'}`}>
+                      <p className="text-lg font-bold text-green-700">{syncCadCounts.linked}</p>
+                      <p className="text-[10px] text-green-600 font-medium uppercase">Vinculados</p>
+                    </button>
+                  </div>
+                  <div className="relative">
+                    <Search className="w-4 h-4 absolute left-3 top-2.5 text-gray-400" />
+                    <input value={syncCadSearch} onChange={e => setSyncCadSearch(e.target.value)}
+                      placeholder="Buscar por nome, CNPJ..." className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-green-500 focus:border-transparent" />
+                  </div>
+                </div>
+
+                {/* Tabela */}
+                <div className="overflow-auto flex-1">
+                  <table className="w-full text-sm min-w-[900px]">
+                    <thead className="bg-gray-100 sticky top-0 z-10">
+                      <tr className="text-left text-xs text-gray-500 uppercase">
+                        <th className="px-3 py-2 w-24">Status</th>
+                        <th className="px-3 py-2">Cadastro iAgru</th>
+                        <th className="px-3 py-2 w-10 text-center"><ArrowUpDown className="w-3.5 h-3.5 mx-auto" /></th>
+                        <th className="px-3 py-2">Empresa Aegro</th>
+                        <th className="px-3 py-2">CPF/CNPJ</th>
+                        <th className="px-3 py-2">UF/Cidade</th>
+                        <th className="px-3 py-2 w-32 text-center">Ação</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {filteredSyncs.length === 0 && (
+                        <tr><td colSpan={7} className="text-center py-8 text-gray-400">Nenhum cadastro encontrado com este filtro</td></tr>
+                      )}
+                      {filteredSyncs.map((s, idx) => {
+                        // Achar o index real no array original para ações
+                        const realIdx = companySyncs.indexOf(s)
+                        const statusBadge = {
+                          linked: <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-green-100 text-green-700 text-[10px] font-semibold"><CheckCircle2 className="w-3 h-3" /> Vinculado</span>,
+                          match_suggestion: <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-purple-100 text-purple-700 text-[10px] font-semibold"><LinkIcon className="w-3 h-3" /> Match{s.matchField === 'cpf_cnpj' ? ' (CNPJ)' : ' (Nome)'}</span>,
+                          only_iagru: <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-orange-100 text-orange-700 text-[10px] font-semibold">Apenas iAgru</span>,
+                          only_aegro: <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 text-[10px] font-semibold">Apenas Aegro</span>,
+                        }[s.status]
+
+                        return (
+                          <tr key={realIdx} className={`border-b hover:bg-gray-50 ${s.done ? 'bg-green-50/50' : ''} ${s.error ? 'bg-red-50/50' : ''}`}>
+                            <td className="px-3 py-2">{statusBadge}</td>
+                            <td className="px-3 py-2">
+                              {s.iagruNome ? (
+                                <div>
+                                  <p className="font-medium text-gray-800 text-xs">{s.iagruNome}</p>
+                                  {s.iagruNomeFantasia && <p className="text-[10px] text-gray-400">{s.iagruNomeFantasia}</p>}
+                                  {s.iagruTipos.length > 0 && (
+                                    <div className="flex gap-1 mt-0.5 flex-wrap">{s.iagruTipos.map(t => <span key={t} className="text-[9px] bg-gray-200 text-gray-600 px-1.5 py-0.5 rounded">{t}</span>)}</div>
+                                  )}
+                                </div>
+                              ) : <span className="text-gray-300 text-xs">—</span>}
+                            </td>
+                            <td className="px-3 py-2 text-center">
+                              {s.status === 'match_suggestion' && <ArrowRight className="w-4 h-4 text-purple-400 mx-auto" />}
+                              {s.status === 'linked' && <LinkIcon className="w-4 h-4 text-green-400 mx-auto" />}
+                            </td>
+                            <td className="px-3 py-2">
+                              {s.aegroName ? (
+                                <div>
+                                  <p className="font-medium text-gray-800 text-xs">{s.aegroName}</p>
+                                  {s.aegroTradeName && <p className="text-[10px] text-gray-400">{s.aegroTradeName}</p>}
+                                </div>
+                              ) : <span className="text-gray-300 text-xs">—</span>}
+                            </td>
+                            <td className="px-3 py-2 text-xs text-gray-600 font-mono">
+                              {s.iagruCpfCnpj || s.aegroCpfCnpj || <span className="text-gray-300">—</span>}
+                            </td>
+                            <td className="px-3 py-2 text-xs text-gray-600">
+                              {s.iagruUf || s.aegroState ? `${s.iagruUf || s.aegroState || ''}${s.iagruCidade || s.aegroCity ? ` / ${s.iagruCidade || s.aegroCity}` : ''}` : <span className="text-gray-300">—</span>}
+                            </td>
+                            <td className="px-3 py-2 text-center">
+                              {s.processing && <Loader2 className="w-4 h-4 animate-spin text-green-600 mx-auto" />}
+                              {s.done && <span className="text-green-600 text-xs font-medium flex items-center justify-center gap-1"><Check className="w-3.5 h-3.5" /> OK</span>}
+                              {s.error && <span className="text-red-500 text-[10px]" title={s.error}>Erro</span>}
+                              {!s.processing && !s.done && !s.error && s.status === 'match_suggestion' && (
+                                <button onClick={() => handleLinkCadastro(realIdx)}
+                                  className="px-2.5 py-1 bg-purple-600 text-white rounded text-[11px] font-medium hover:bg-purple-700 flex items-center gap-1 mx-auto">
+                                  <LinkIcon className="w-3 h-3" /> Vincular
+                                </button>
+                              )}
+                              {!s.processing && !s.done && !s.error && s.status === 'only_iagru' && (
+                                <button onClick={() => handleSendToAegro(realIdx)}
+                                  className="px-2.5 py-1 bg-orange-600 text-white rounded text-[11px] font-medium hover:bg-orange-700 flex items-center gap-1 mx-auto">
+                                  <Upload className="w-3 h-3" /> Enviar
+                                </button>
+                              )}
+                              {!s.processing && !s.done && !s.error && s.status === 'only_aegro' && (
+                                <button onClick={() => handleImportFromAegro(realIdx)}
+                                  className="px-2.5 py-1 bg-blue-600 text-white rounded text-[11px] font-medium hover:bg-blue-700 flex items-center gap-1 mx-auto">
+                                  <Download className="w-3 h-3" /> Importar
+                                </button>
+                              )}
+                              {!s.processing && !s.done && !s.error && s.status === 'linked' && (
+                                <span className="text-green-500 text-[10px]">Sincronizado</span>
+                              )}
+                            </td>
+                          </tr>
+                        )
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+
+                {/* Footer */}
+                <div className="flex items-center justify-between p-3 border-t bg-gray-50 rounded-b-xl shrink-0">
+                  <div className="text-xs text-gray-500">
+                    {filteredSyncs.length} de {companySyncs.length} cadastros
+                    {syncCadFilter && <span className="text-blue-500 ml-1">(filtrado: {syncCadFilter === 'match_suggestion' ? 'sugestões' : syncCadFilter === 'only_iagru' ? 'apenas iAgru' : syncCadFilter === 'only_aegro' ? 'apenas Aegro' : 'vinculados'})</span>}
+                  </div>
+                  <button onClick={() => setShowSyncCadModal(false)} className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-100">
+                    Fechar
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* ========== MODAL MAPEAMENTO DE/PARA ========== */}
       {showMapModal && (

@@ -21,6 +21,18 @@ export const updateCadastro = async (id: string, data: any) =>
 export const deleteCadastro = async (id: string) =>
   throwIfError(await supabase.from('cadastros').delete().eq('id', id))
 
+// Cadastros com vínculo Aegro
+export const getImportedAegroCadastros = async () => {
+  const { data } = await supabase.from('cadastros').select('id, aegro_company_key, nome, nome_fantasia, cpf_cnpj, telefone1, uf, cidade, tipos').not('aegro_company_key', 'is', null)
+  return data || []
+}
+
+export const upsertCadastroAegroKey = async (id: string, aegroKey: string) =>
+  throwIfError(await supabase.from('cadastros').update({ aegro_company_key: aegroKey, tipo_cadastro: 'api', origem_cadastro: 'aegro' }).eq('id', id).select().single())
+
+export const createCadastroFromAegro = async (data: any) =>
+  throwIfError(await supabase.from('cadastros').insert({ ...data, tipo_cadastro: 'api', origem_cadastro: 'aegro' }).select().single())
+
 // === VEICULOS ===
 export const getVeiculos = async () => {
   const { data, error } = await supabase

@@ -3,7 +3,9 @@
  * Contorna o bloqueio de CORS fazendo a chamada server-side
  * 
  * Uso: POST /api/aegro-proxy
- * Body: { endpoint: "/farms", token: "aegro_..." }
+ * Body: { endpoint: "/farms", token: "aegro_...", method?: "GET"|"POST"|"PUT", body?: {...} }
+ * 
+ * Se 'method' não for informado, infere: POST para /filter, GET para demais.
  */
 
 export default async function handler(req, res) {
@@ -32,9 +34,9 @@ export default async function handler(req, res) {
   // URL e header conforme documentação oficial: https://app.aegro.com.br/docs/public-api/
   const AEGRO_BASE = 'https://app.aegro.com.br/pub/v1'
 
-  // Determinar método HTTP (POST para endpoints /filter, GET para os demais)
-  const method = endpoint.endsWith('/filter') ? 'POST' : 'GET'
-  const { body: requestBody } = req.body || {}
+  // Método HTTP: usar explícito se fornecido, senão inferir (POST para /filter, GET para demais)
+  const { body: requestBody, method: explicitMethod } = req.body || {}
+  const method = explicitMethod || (endpoint.endsWith('/filter') ? 'POST' : 'GET')
 
   try {
     const fetchOptions = {
@@ -46,8 +48,8 @@ export default async function handler(req, res) {
       },
     }
 
-    // Adicionar body para requisições POST (filtros)
-    if (method === 'POST' && requestBody) {
+    // Adicionar body para requisições POST e PUT
+    if ((method === 'POST' || method === 'PUT') && requestBody) {
       fetchOptions.body = JSON.stringify(requestBody)
     }
 
