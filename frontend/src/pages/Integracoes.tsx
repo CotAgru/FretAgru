@@ -682,17 +682,20 @@ export default function Integracoes() {
   // Ação: enviar cadastro iAgru para o Aegro (POST /companies)
   const handleSendToAegro = async (idx: number) => {
     const s = companySyncs[idx]
-    if (!s.iagruId) return
+    if (!s.iagruId || !s.iagruNome?.trim()) {
+      toast.error('Nome do cadastro é obrigatório')
+      return
+    }
     setCompanySyncs(prev => prev.map((item, i) => i === idx ? { ...item, processing: true } : item))
     try {
-      const payload: any = {
-        name: s.iagruNome || '',
-        tradeName: s.iagruNomeFantasia || undefined,
-        cpfCnpj: s.iagruCpfCnpj || undefined,
-        phone: s.iagruTelefone || undefined,
-        state: s.iagruUf || undefined,
-        city: s.iagruCidade || undefined,
-      }
+      // Montar payload apenas com campos que têm valor (Aegro não aceita undefined)
+      const payload: any = { name: s.iagruNome.trim() }
+      if (s.iagruNomeFantasia?.trim()) payload.tradeName = s.iagruNomeFantasia.trim()
+      if (s.iagruCpfCnpj?.trim()) payload.cpfCnpj = s.iagruCpfCnpj.trim()
+      if (s.iagruTelefone?.trim()) payload.phone = s.iagruTelefone.trim()
+      if (s.iagruUf?.trim()) payload.state = s.iagruUf.trim()
+      if (s.iagruCidade?.trim()) payload.city = s.iagruCidade.trim()
+
       const result = await aegroCreateCompany(token.trim(), payload)
       const newKey = result?.key || result?.companyKey || ''
       if (newKey) {
@@ -705,8 +708,10 @@ export default function Integracoes() {
         throw new Error('Aegro não retornou company key')
       }
     } catch (err: any) {
-      setCompanySyncs(prev => prev.map((item, i) => i === idx ? { ...item, processing: false, error: err?.message || 'Erro' } : item))
-      toast.error('Erro ao enviar: ' + (err?.message || ''))
+      const errorMsg = err?.message || 'Erro desconhecido'
+      console.error('Erro ao enviar para Aegro:', err)
+      setCompanySyncs(prev => prev.map((item, i) => i === idx ? { ...item, processing: false, error: errorMsg } : item))
+      toast.error(`Erro ao enviar: ${errorMsg}`)
     }
   }
 
