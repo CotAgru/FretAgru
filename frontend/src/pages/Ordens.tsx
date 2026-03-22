@@ -17,7 +17,7 @@ const STATUS_OPTIONS = [
   { value: 'cancelado', label: 'Cancelado', color: 'bg-red-100 text-red-700' },
 ]
 const TIPOS_ORIGEM = ['Fazenda', 'Armazem', 'Industria', 'Porto', 'Fornecedor']
-const TODOS_TIPOS = ['Armazem', 'Fazenda', 'Fornecedor', 'Industria', 'Motorista', 'Outro', 'Porto', 'Produtor', 'Transportadora']
+const TODOS_TIPOS = ['Armazem', 'Comprador', 'Corretor', 'Fazenda', 'Fornecedor', 'Industria', 'Motorista', 'Outro', 'Porto', 'Produtor', 'Transportadora']
 
 const formatPhone = (value: string) => {
   const digits = value.replace(/\D/g, '').slice(0, 11)

@@ -4,7 +4,7 @@ import {
   Truck, Users, Package, DollarSign, LayoutDashboard, CarFront,
   ClipboardList, FileText, Menu, X, FolderOpen, ChevronDown,
   ChevronRight, Settings, Upload, Sprout, ShoppingCart,
-  BarChart3, FileSignature, Wheat
+  BarChart3, FileSignature, Wheat, Link2
 } from 'lucide-react'
 
 interface NavItem {
@@ -58,6 +58,7 @@ const GERAL_ITEMS: NavItem[] = [
 
 const SISTEMA_ITEMS: NavItem[] = [
   { path: '/admin', label: 'Administração', icon: Settings },
+  { path: '/integracoes', label: 'Integrações', icon: Link2 },
 ]
 
 export default function Layout({ children }: { children: ReactNode }) {

@@ -13,7 +13,7 @@ import { exportToExcel } from '../utils/export'
 const GOOGLE_MAPS_API_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY || ''
 const DEFAULT_CENTER = { lat: -15.7801, lng: -47.9292 }
 
-const TODOS_TIPOS = ['Armazem', 'Fazenda', 'Fornecedor', 'Industria', 'Motorista', 'Outro', 'Porto', 'Produtor', 'Transportadora']
+const TODOS_TIPOS = ['Armazem', 'Comprador', 'Corretor', 'Fazenda', 'Fornecedor', 'Industria', 'Motorista', 'Outro', 'Porto', 'Produtor', 'Transportadora']
 const TIPOS_COM_LOCALIZACAO = ['Fazenda', 'Armazem', 'Industria', 'Porto', 'Fornecedor']
 
 interface Cadastro {

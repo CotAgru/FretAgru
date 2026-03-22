@@ -16,6 +16,7 @@ import DashboardContratos from './pages/DashboardContratos'
 import ContratosVenda from './pages/ContratosVenda'
 import CompraInsumos from './pages/CompraInsumos'
 import Safra from './pages/Safra'
+import Integracoes from './pages/Integracoes'
 
 function App() {
   return (
@@ -44,6 +45,7 @@ function App() {
           <Route path="/produtos" element={<Produtos />} />
           <Route path="/safra" element={<Safra />} />
           <Route path="/admin" element={<Admin />} />
+          <Route path="/integracoes" element={<Integracoes />} />
 
           {/* Redirects de compatibilidade (rotas antigas) */}
           <Route path="/operacoes" element={<Navigate to="/frete/operacoes" replace />} />

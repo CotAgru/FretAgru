@@ -362,7 +362,31 @@ export const updateCompraInsumo = async (id: string, data: any) =>
 export const deleteCompraInsumo = async (id: string) =>
   throwIfError(await supabase.from('contratos_compra_insumo').delete().eq('id', id))
 
-// === UPLOAD IMAGEM ROMANEIO (Supabase Storage) ===
+// === INTEGRAÇÕES ===
+export const getIntegracoes = async () => {
+  const { data, error } = await supabase.from('integracoes').select('*').order('created_at', { ascending: false })
+  if (error) throw error
+  return data || []
+}
+
+export const getIntegracaoByProvedor = async (provedor: string) => {
+  const { data, error } = await supabase.from('integracoes').select('*').eq('provedor', provedor).maybeSingle()
+  if (error) throw error
+  return data
+}
+
+export const upsertIntegracao = async (provedor: string, payload: any) => {
+  const existing = await getIntegracaoByProvedor(provedor)
+  if (existing) {
+    return throwIfError(await supabase.from('integracoes').update(payload).eq('id', existing.id).select().single())
+  }
+  return throwIfError(await supabase.from('integracoes').insert({ provedor, ...payload }).select().single())
+}
+
+export const deleteIntegracao = async (id: string) =>
+  throwIfError(await supabase.from('integracoes').delete().eq('id', id))
+
+// === UPLOAD IMAGEM ROMANEIO ===
 export const uploadRomaneioImage = async (base64DataUrl: string, romaneioId?: string): Promise<string> => {
   
   const match = base64DataUrl.match(/^data:(image\/\w+);base64,(.+)$/)
