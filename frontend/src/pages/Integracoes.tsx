@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
-import { Link2, Loader2, CheckCircle2, XCircle, RefreshCw, Trash2, Eye, EyeOff, X, ArrowRight, Check } from 'lucide-react'
+import { Link2, Loader2, CheckCircle2, XCircle, RefreshCw, Trash2, Eye, EyeOff, X, ArrowRight, Check, Filter } from 'lucide-react'
 import toast from 'react-hot-toast'
-import { getIntegracaoByProvedor, upsertIntegracao, deleteIntegracao, getCulturas, createCultura, getTiposSafra, createTipoSafra, getAnosSafra, createAnoSafra, upsertSafraFromAegro } from '../services/api'
+import { getIntegracaoByProvedor, upsertIntegracao, deleteIntegracao, getCulturas, createCultura, getTiposSafra, createTipoSafra, getAnosSafra, createAnoSafra, upsertSafraFromAegro, getImportedAegroSafras } from '../services/api'
 import { aegroTestConnection, aegroGetCrops } from '../services/aegro'
 import { fmtData } from '../utils/format'
 
@@ -9,10 +9,11 @@ const FARM_ID_PADRAO = '61af6824b4d7196ebc0076f0'
 
 // Mapa de type Aegro → nome cultura em pt-BR
 const AEGRO_TYPE_MAP: Record<string, string> = {
-  soy: 'Soja', corn: 'Milho', sorghum: 'Sorgo', beans: 'Feijão', cotton: 'Algodão',
-  wheat: 'Trigo', coffee: 'Café', sugarcane: 'Cana-de-Açúcar', rice: 'Arroz',
-  oat: 'Aveia', citrus: 'Citros', barley: 'Cevada', sunflower: 'Girassol',
+  soy: 'Soja', corn: 'Milho', sorghum: 'Sorgo', beans: 'Feijão', bean: 'Feijão',
+  cotton: 'Algodão', wheat: 'Trigo', coffee: 'Café', sugarcane: 'Cana-de-Açúcar',
+  rice: 'Arroz', oat: 'Aveia', citrus: 'Citros', barley: 'Cevada', sunflower: 'Girassol',
   peanut: 'Amendoim', potato: 'Batata', tobacco: 'Tabaco', millet: 'Milheto',
+  other: 'Geral', grass: 'Pastagem', eucalyptus: 'Eucalipto',
 }
 
 interface CropMapping {
@@ -26,6 +27,8 @@ interface CropMapping {
   tipoSafraId: string
   anoSafraId: string
   selected: boolean
+  alreadyImported: boolean
+  hasChanges: boolean
 }
 
 export default function Integracoes() {
@@ -51,6 +54,10 @@ export default function Integracoes() {
   const [newCultura, setNewCultura] = useState('')
   const [newTipoSafra, setNewTipoSafra] = useState('')
   const [newAnoSafra, setNewAnoSafra] = useState('')
+  // Filtros do modal
+  const [filterNome, setFilterNome] = useState('')
+  const [filterType, setFilterType] = useState('')
+  const [filterAnoSafra, setFilterAnoSafra] = useState('')
 
   const loadAegro = async () => {
     setLoading(true)
@@ -160,13 +167,17 @@ export default function Integracoes() {
     setLoadingCrops(true)
     setShowMapModal(true)
     setImportResult(null)
+    setFilterNome('')
+    setFilterType('')
+    setFilterAnoSafra('')
     try {
-      // Buscar crops do Aegro + dados auxiliares do iAgru em paralelo
-      const [cropsData, cults, tipos, anos] = await Promise.all([
+      // Buscar crops do Aegro + dados auxiliares + safras já importadas em paralelo
+      const [cropsData, cults, tipos, anos, imported] = await Promise.all([
         aegroGetCrops(token.trim()),
         getCulturas(),
         getTiposSafra(),
         getAnosSafra(),
+        getImportedAegroSafras(),
       ])
       const crops = cropsData?.items || (Array.isArray(cropsData) ? cropsData : [])
       if (crops.length === 0) { toast.error('Nenhuma safra encontrada no Aegro'); setShowMapModal(false); setLoadingCrops(false); return }
@@ -174,6 +185,9 @@ export default function Integracoes() {
       setCulturas(cults)
       setTiposSafra(tipos)
       setAnosSafra(anos)
+
+      // Mapa de safras já importadas por aegro_crop_key
+      const importedMap = new Map(imported.map((s: any) => [s.aegro_crop_key, s]))
 
       // Pré-mapear cada crop
       const cultMap = new Map<string, string>(cults.map((c: any) => [c.nome.toLowerCase(), c.id]))
@@ -183,25 +197,37 @@ export default function Integracoes() {
       const mappings: CropMapping[] = crops.map((crop: any) => {
         const aegroType = crop.type || ''
         const cropName = crop.name || ''
+        const cropKey = crop.key || ''
         const startDate = crop.startDate || null
+        const endDate = crop.endDate || null
+        const areaHa = crop.totalArea?.magnitude || crop.area?.magnitude || null
+
+        // Verificar se já foi importada
+        const existingImport = importedMap.get(cropKey)
+        const alreadyImported = !!existingImport
 
         // Auto-detectar cultura pelo type do Aegro
         const cultNome = AEGRO_TYPE_MAP[aegroType.toLowerCase()] || ''
-        const culturaId = cultMap.get(cultNome.toLowerCase()) || ''
+        let culturaId = cultMap.get(cultNome.toLowerCase()) || ''
 
         // Auto-detectar tipo safra pelo nome
         const lower = cropName.toLowerCase()
         let tipoSafraId = ''
-        if (lower.includes('safrinha') || lower.includes('2a safra')) tipoSafraId = tipoMap.get('safrinha') || ''
+        if (lower.includes('safrinha') || lower.includes('2a safra')) tipoSafraId = tipoMap.get('safrinha') || tipoMap.get('2ª safrinha') || ''
         else if (lower.includes('inverno')) tipoSafraId = tipoMap.get('inverno') || ''
-        else if (lower.includes('verão') || lower.includes('verao') || lower.includes('1a safra')) tipoSafraId = tipoMap.get('verão') || ''
+        else if (lower.includes('verão') || lower.includes('verao') || lower.includes('1a safra')) tipoSafraId = tipoMap.get('verão') || tipoMap.get('1ª safra') || ''
 
-        // Auto-detectar ano safra
+        // Auto-detectar ano safra pelo nome da crop
         let anoSafraId = ''
         const anoMatch = cropName.match(/(\d{2,4})\/(\d{2,4})/)
         if (anoMatch) {
-          const anoNome = anoMatch[0].length <= 5 ? anoMatch[0] : `${anoMatch[1].slice(-2)}/${anoMatch[2].slice(-2)}`
-          anoSafraId = anoMap.get(anoNome.toLowerCase()) || ''
+          const a = anoMatch[1].slice(-2)
+          const b = anoMatch[2].slice(-2)
+          // xx/xx onde ambos são iguais = NÃO é ano safra válido, pular
+          if (a !== b) {
+            const anoNome = `${a}/${b}`
+            anoSafraId = anoMap.get(anoNome.toLowerCase()) || ''
+          }
         } else if (startDate) {
           const y = new Date(startDate).getFullYear()
           const m = new Date(startDate).getMonth()
@@ -209,18 +235,42 @@ export default function Integracoes() {
           anoSafraId = anoMap.get(anoNome) || ''
         }
 
+        // Se já importada, usar os dados existentes para pré-preencher e comparar
+        if (alreadyImported && existingImport) {
+          culturaId = existingImport.cultura_id || culturaId
+          tipoSafraId = existingImport.tipo_safra_id || tipoSafraId
+          anoSafraId = existingImport.ano_safra_id || anoSafraId
+        }
+
+        // Verificar se os dados mudaram comparando com o que já está no DB
+        let hasChanges = false
+        if (alreadyImported && existingImport) {
+          hasChanges = existingImport.nome !== cropName ||
+            existingImport.area_ha !== areaHa ||
+            existingImport.data_inicio !== startDate ||
+            existingImport.data_fim !== endDate
+        }
+
         return {
-          cropKey: crop.key || '',
+          cropKey,
           cropName,
           aegroType,
           startDate,
-          endDate: crop.endDate || null,
-          areaHa: crop.totalArea?.magnitude || crop.area?.magnitude || null,
+          endDate,
+          areaHa,
           culturaId,
           tipoSafraId,
           anoSafraId,
-          selected: true,
+          selected: !alreadyImported, // Não selecionar as já importadas por padrão
+          alreadyImported,
+          hasChanges,
         }
+      })
+
+      // Ordenar: novas primeiro, já importadas por último
+      mappings.sort((a, b) => {
+        if (a.alreadyImported !== b.alreadyImported) return a.alreadyImported ? 1 : -1
+        return a.cropName.localeCompare(b.cropName)
       })
 
       setCropMappings(mappings)
@@ -267,9 +317,35 @@ export default function Integracoes() {
     setCropMappings(prev => prev.map((m, i) => i === idx ? { ...m, [field]: value } : m))
   }
 
-  // === APLICAR MESMO VALOR PARA TODAS AS CROPS (atalho) ===
+  // === FILTRO: extrair ano safra do nome da crop (ex: "STR SJ 21/22" → "21/22") ===
+  const extractAnoFromName = (name: string) => {
+    const match = name.match(/(\d{2,4})\/(\d{2,4})/)
+    if (!match) return ''
+    return `${match[1].slice(-2)}/${match[2].slice(-2)}`
+  }
+
+  // === LISTA FILTRADA (calculada) ===
+  const getFilteredIndices = () => {
+    return cropMappings.map((m, idx) => {
+      const matchNome = !filterNome || m.cropName.toLowerCase().includes(filterNome.toLowerCase())
+      const matchType = !filterType || m.aegroType.toLowerCase() === filterType.toLowerCase()
+      const matchAno = !filterAnoSafra || extractAnoFromName(m.cropName) === filterAnoSafra
+      return matchNome && matchType && matchAno ? idx : -1
+    }).filter(i => i >= 0)
+  }
+
+  const filteredIndices = getFilteredIndices()
+  const filteredMappings = filteredIndices.map(i => ({ ...cropMappings[i], _idx: i }))
+
+  // Valores únicos para dropdown de filtro Type
+  const uniqueTypes = [...new Set(cropMappings.map(m => m.aegroType).filter(Boolean))].sort()
+  // Valores únicos para dropdown de filtro Ano (extraído do nome)
+  const uniqueAnos = [...new Set(cropMappings.map(m => extractAnoFromName(m.cropName)).filter(Boolean))].sort()
+
+  // === APLICAR MESMO VALOR PARA CROPS FILTRADAS/VISÍVEIS ===
   const applyToAll = (field: 'culturaId' | 'tipoSafraId' | 'anoSafraId', value: string) => {
-    setCropMappings(prev => prev.map(m => ({ ...m, [field]: value })))
+    const visibleSet = new Set(filteredIndices)
+    setCropMappings(prev => prev.map((m, i) => visibleSet.has(i) ? { ...m, [field]: value } : m))
   }
 
   // === CONFIRMAR IMPORTAÇÃO ===
@@ -498,35 +574,72 @@ export default function Integracoes() {
               </div>
             ) : (
               <>
-                {/* Atalhos — Criar novos itens + aplicar a todos */}
-                <div className="p-3 bg-gray-50 border-b shrink-0">
-                  <p className="text-xs font-semibold text-gray-600 uppercase tracking-wide mb-3">Criar novos itens auxiliares (se necessário)</p>
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                    <div className="flex gap-1">
-                      <input value={newCultura} onChange={e => setNewCultura(e.target.value)} placeholder="Nova cultura..."
-                        className="flex-1 px-2 py-1.5 border rounded-lg text-sm" onKeyDown={e => e.key === 'Enter' && handleCreateCultura()} />
-                      <button onClick={handleCreateCultura} className="px-3 py-1.5 bg-green-600 text-white rounded-lg text-sm hover:bg-green-700">+</button>
+                {/* Barra superior: Criar itens + Filtros */}
+                <div className="p-3 bg-gray-50 border-b shrink-0 space-y-3">
+                  {/* Criar novos itens auxiliares */}
+                  <div>
+                    <p className="text-xs font-semibold text-gray-600 uppercase tracking-wide mb-2">Criar novos itens auxiliares</p>
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                      <div className="flex gap-1">
+                        <input value={newCultura} onChange={e => setNewCultura(e.target.value)} placeholder="Nova cultura..."
+                          className="flex-1 px-2 py-1.5 border rounded-lg text-sm" onKeyDown={e => e.key === 'Enter' && handleCreateCultura()} />
+                        <button onClick={handleCreateCultura} className="px-3 py-1.5 bg-green-600 text-white rounded-lg text-sm hover:bg-green-700">+</button>
+                      </div>
+                      <div className="flex gap-1">
+                        <input value={newTipoSafra} onChange={e => setNewTipoSafra(e.target.value)} placeholder="Novo tipo safra..."
+                          className="flex-1 px-2 py-1.5 border rounded-lg text-sm" onKeyDown={e => e.key === 'Enter' && handleCreateTipoSafra()} />
+                        <button onClick={handleCreateTipoSafra} className="px-3 py-1.5 bg-green-600 text-white rounded-lg text-sm hover:bg-green-700">+</button>
+                      </div>
+                      <div className="flex gap-1">
+                        <input value={newAnoSafra} onChange={e => setNewAnoSafra(e.target.value)} placeholder="Novo ano safra (ex: 25/26)..."
+                          className="flex-1 px-2 py-1.5 border rounded-lg text-sm" onKeyDown={e => e.key === 'Enter' && handleCreateAnoSafra()} />
+                        <button onClick={handleCreateAnoSafra} className="px-3 py-1.5 bg-green-600 text-white rounded-lg text-sm hover:bg-green-700">+</button>
+                      </div>
                     </div>
-                    <div className="flex gap-1">
-                      <input value={newTipoSafra} onChange={e => setNewTipoSafra(e.target.value)} placeholder="Novo tipo safra..."
-                        className="flex-1 px-2 py-1.5 border rounded-lg text-sm" onKeyDown={e => e.key === 'Enter' && handleCreateTipoSafra()} />
-                      <button onClick={handleCreateTipoSafra} className="px-3 py-1.5 bg-green-600 text-white rounded-lg text-sm hover:bg-green-700">+</button>
+                  </div>
+                  {/* Filtros Aegro */}
+                  <div>
+                    <p className="text-xs font-semibold text-gray-600 uppercase tracking-wide mb-2 flex items-center gap-1">
+                      <Filter className="w-3 h-3" /> Filtrar dados do Aegro
+                      {(filterNome || filterType || filterAnoSafra) && (
+                        <button onClick={() => { setFilterNome(''); setFilterType(''); setFilterAnoSafra('') }}
+                          className="ml-2 text-[10px] text-red-500 hover:text-red-700 font-normal underline">limpar filtros</button>
+                      )}
+                    </p>
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                      <input value={filterNome} onChange={e => setFilterNome(e.target.value)} placeholder="Filtrar por nome..."
+                        className="px-2 py-1.5 border rounded-lg text-sm" />
+                      <select value={filterType} onChange={e => setFilterType(e.target.value)}
+                        className="px-2 py-1.5 border rounded-lg text-sm">
+                        <option value="">Todos os types</option>
+                        {uniqueTypes.map(t => <option key={t} value={t}>{t.toUpperCase()} {AEGRO_TYPE_MAP[t.toLowerCase()] ? `(${AEGRO_TYPE_MAP[t.toLowerCase()]})` : ''}</option>)}
+                      </select>
+                      <select value={filterAnoSafra} onChange={e => setFilterAnoSafra(e.target.value)}
+                        className="px-2 py-1.5 border rounded-lg text-sm">
+                        <option value="">Todos os períodos</option>
+                        {uniqueAnos.map(a => <option key={a} value={a}>{a}</option>)}
+                      </select>
                     </div>
-                    <div className="flex gap-1">
-                      <input value={newAnoSafra} onChange={e => setNewAnoSafra(e.target.value)} placeholder="Novo ano safra (ex: 25/26)..."
-                        className="flex-1 px-2 py-1.5 border rounded-lg text-sm" onKeyDown={e => e.key === 'Enter' && handleCreateAnoSafra()} />
-                      <button onClick={handleCreateAnoSafra} className="px-3 py-1.5 bg-green-600 text-white rounded-lg text-sm hover:bg-green-700">+</button>
-                    </div>
+                    {(filterNome || filterType || filterAnoSafra) && (
+                      <p className="text-[11px] text-blue-600 mt-1">
+                        Mostrando {filteredMappings.length} de {cropMappings.length} safras — "Aplicar a todos" afeta apenas as filtradas
+                      </p>
+                    )}
                   </div>
                 </div>
 
                 {/* Tabela de mapeamento */}
                 <div className="overflow-auto flex-1 min-h-0">
                   <table className="w-full text-sm min-w-[900px]">
-                    <thead className="bg-gray-100 sticky top-0">
+                    <thead className="bg-gray-100 sticky top-0 z-10">
                       <tr>
                         <th className="px-2 py-2 text-left w-8">
-                          <input type="checkbox" checked={cropMappings.every(m => m.selected)} onChange={e => setCropMappings(prev => prev.map(m => ({ ...m, selected: e.target.checked })))}
+                          <input type="checkbox"
+                            checked={filteredMappings.length > 0 && filteredMappings.every(m => m.selected)}
+                            onChange={e => {
+                              const visibleSet = new Set(filteredIndices)
+                              setCropMappings(prev => prev.map((m, i) => visibleSet.has(i) ? { ...m, selected: e.target.checked } : m))
+                            }}
                             className="rounded border-gray-300" />
                         </th>
                         <th className="px-2 py-2 text-left text-xs font-semibold text-gray-600">Nome da Safra</th>
@@ -539,7 +652,7 @@ export default function Integracoes() {
                           {culturas.length > 0 && (
                             <select className="mt-0.5 text-[11px] border rounded px-1 py-0.5 font-normal text-gray-500 w-full"
                               onChange={e => { if (e.target.value) applyToAll('culturaId', e.target.value); e.target.value = '' }}>
-                              <option value="">aplicar a todos</option>
+                              <option value="">{filterNome || filterType || filterAnoSafra ? 'aplicar filtradas' : 'aplicar a todos'}</option>
                               {culturas.map((c: any) => <option key={c.id} value={c.id}>{c.nome}</option>)}
                             </select>
                           )}
@@ -549,7 +662,7 @@ export default function Integracoes() {
                           {tiposSafra.length > 0 && (
                             <select className="mt-0.5 text-[11px] border rounded px-1 py-0.5 font-normal text-gray-500 w-full"
                               onChange={e => { if (e.target.value) applyToAll('tipoSafraId', e.target.value); e.target.value = '' }}>
-                              <option value="">aplicar a todos</option>
+                              <option value="">{filterNome || filterType || filterAnoSafra ? 'aplicar filtradas' : 'aplicar a todos'}</option>
                               {tiposSafra.map((t: any) => <option key={t.id} value={t.id}>{t.nome}</option>)}
                             </select>
                           )}
@@ -559,7 +672,7 @@ export default function Integracoes() {
                           {anosSafra.length > 0 && (
                             <select className="mt-0.5 text-[11px] border rounded px-1 py-0.5 font-normal text-gray-500 w-full"
                               onChange={e => { if (e.target.value) applyToAll('anoSafraId', e.target.value); e.target.value = '' }}>
-                              <option value="">aplicar a todos</option>
+                              <option value="">{filterNome || filterType || filterAnoSafra ? 'aplicar filtradas' : 'aplicar a todos'}</option>
                               {anosSafra.map((a: any) => <option key={a.id} value={a.id}>{a.nome}</option>)}
                             </select>
                           )}
@@ -567,21 +680,41 @@ export default function Integracoes() {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-100">
-                      {cropMappings.map((m, idx) => {
+                      {filteredMappings.map((m) => {
+                        const idx = m._idx
                         const hasError = m.selected && (!m.culturaId || !m.anoSafraId)
                         return (
-                          <tr key={m.cropKey} className={`${hasError ? 'bg-red-50' : m.selected ? 'bg-white' : 'bg-gray-50 opacity-60'} hover:bg-green-50/30`}>
+                          <tr key={m.cropKey} className={`
+                            ${m.alreadyImported && !m.hasChanges ? 'bg-green-50/50 opacity-70' : ''}
+                            ${m.alreadyImported && m.hasChanges ? 'bg-yellow-50' : ''}
+                            ${!m.alreadyImported && hasError ? 'bg-red-50' : ''}
+                            ${!m.alreadyImported && !hasError && m.selected ? 'bg-white' : ''}
+                            ${!m.selected && !m.alreadyImported ? 'bg-gray-50 opacity-60' : ''}
+                            hover:bg-green-50/30
+                          `}>
                             <td className="px-2 py-1.5">
                               <input type="checkbox" checked={m.selected} onChange={e => updateMapping(idx, 'selected', e.target.checked)}
                                 className="rounded border-gray-300" />
                             </td>
-                            <td className="px-2 py-1.5 font-medium text-gray-800 text-xs whitespace-nowrap">{m.cropName}</td>
+                            <td className="px-2 py-1.5 text-xs whitespace-nowrap">
+                              <span className="font-medium text-gray-800">{m.cropName}</span>
+                              {m.alreadyImported && !m.hasChanges && (
+                                <span className="ml-1.5 inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[10px] font-medium bg-green-100 text-green-700">
+                                  <CheckCircle2 className="w-2.5 h-2.5" /> importada
+                                </span>
+                              )}
+                              {m.alreadyImported && m.hasChanges && (
+                                <span className="ml-1.5 inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[10px] font-medium bg-yellow-100 text-yellow-700">
+                                  ↻ dados alterados
+                                </span>
+                              )}
+                            </td>
                             <td className="px-2 py-1.5">
                               <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-700">
                                 {m.aegroType || '—'}
                               </span>
                               {AEGRO_TYPE_MAP[m.aegroType?.toLowerCase()] && (
-                                <span className="text-xs text-gray-400 ml-1">({AEGRO_TYPE_MAP[m.aegroType.toLowerCase()]})</span>
+                                <span className="text-[10px] text-gray-400 ml-1">({AEGRO_TYPE_MAP[m.aegroType.toLowerCase()]})</span>
                               )}
                             </td>
                             <td className="px-2 py-1.5 text-[11px] text-gray-500 whitespace-nowrap">
@@ -618,15 +751,22 @@ export default function Integracoes() {
                 </div>
 
                 {/* Footer do modal */}
-                <div className="flex items-center justify-between p-3 border-t bg-gray-50 rounded-b-xl shrink-0">
-                  <p className="text-sm text-gray-500">
-                    {cropMappings.filter(m => m.selected).length} de {cropMappings.length} safras selecionadas
+                <div className="flex flex-wrap items-center justify-between gap-2 p-3 border-t bg-gray-50 rounded-b-xl shrink-0">
+                  <div className="text-xs text-gray-500 space-y-0.5">
+                    <p>
+                      {cropMappings.filter(m => m.selected).length} de {cropMappings.length} selecionadas
+                      {cropMappings.filter(m => m.alreadyImported).length > 0 && (
+                        <span className="text-green-600 ml-1">
+                          ({cropMappings.filter(m => m.alreadyImported).length} já importadas)
+                        </span>
+                      )}
+                    </p>
                     {cropMappings.filter(m => m.selected && (!m.culturaId || !m.anoSafraId)).length > 0 && (
-                      <span className="text-red-500 ml-2">
-                        ({cropMappings.filter(m => m.selected && (!m.culturaId || !m.anoSafraId)).length} com campos obrigatórios vazios)
-                      </span>
+                      <p className="text-red-500">
+                        {cropMappings.filter(m => m.selected && (!m.culturaId || !m.anoSafraId)).length} com campos obrigatórios vazios
+                      </p>
                     )}
-                  </p>
+                  </div>
                   <div className="flex gap-2">
                     <button onClick={() => setShowMapModal(false)} className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-100">
                       Cancelar

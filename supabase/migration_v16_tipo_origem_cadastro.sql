@@ -18,10 +18,9 @@ DELETE FROM culturas WHERE nome NOT IN (
 -- 1c. Deletar tipos_safra que NÃO são do seed original (v12)
 DELETE FROM tipos_safra WHERE nome NOT IN ('Verão', 'Safrinha', 'Inverno');
 
--- 1d. Deletar anos_safra que foram criados automaticamente pela importação
--- (mantém apenas os que já existiam — ajuste conforme necessário)
--- Se quiser manter todos os anos, comente esta linha
--- DELETE FROM ano_safra WHERE nome NOT IN ('24/25', '25/26');
+-- 1d. Deletar anos_safra inválidos (xx/xx onde ambos são iguais, ex: 21/21, 22/22)
+-- Esses foram criados erroneamente pela importação — não representam anos safra válidos
+DELETE FROM ano_safra WHERE nome ~ '^\d{2}/\d{2}$' AND substring(nome from 1 for 2) = substring(nome from 4 for 2);
 
 -- ==========================================
 -- PARTE 2: Campos tipo_cadastro e origem_cadastro

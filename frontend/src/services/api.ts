@@ -305,6 +305,11 @@ export const getSafraByAegroKey = async (aegroKey: string) => {
   return data
 }
 
+export const getImportedAegroSafras = async () => {
+  const { data } = await supabase.from('safras').select('id, aegro_crop_key, nome, cultura_id, tipo_safra_id, ano_safra_id, area_ha, data_inicio, data_fim').not('aegro_crop_key', 'is', null)
+  return data || []
+}
+
 export const upsertSafraFromAegro = async (aegroKey: string, payload: any) => {
   const existing = await getSafraByAegroKey(aegroKey)
   if (existing) {
