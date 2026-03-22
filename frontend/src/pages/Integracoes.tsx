@@ -94,6 +94,9 @@ export default function Integracoes() {
   const [companySyncs, setCompanySyncs] = useState<CompanySync[]>([])
   const [syncCadFilter, setSyncCadFilter] = useState<'' | 'linked' | 'only_iagru' | 'only_aegro' | 'match_suggestion'>('')
   const [syncCadSearch, setSyncCadSearch] = useState('')
+  // Preview antes de enviar ao Aegro
+  const [showPreviewModal, setShowPreviewModal] = useState(false)
+  const [previewData, setPreviewData] = useState<{ idx: number; sync: CompanySync; payload: any } | null>(null)
 
   // Stats de sincronização (dashboard)
   const [syncStats, setSyncStats] = useState<{
@@ -679,27 +682,36 @@ export default function Integracoes() {
     }
   }
 
-  // Ação: enviar cadastro iAgru para o Aegro (POST /companies)
-  const handleSendToAegro = async (idx: number) => {
+  // Ação: abrir preview antes de enviar ao Aegro
+  const handleSendToAegro = (idx: number) => {
     const s = companySyncs[idx]
     if (!s.iagruId || !s.iagruNome?.trim()) {
       toast.error('Nome do cadastro é obrigatório')
       return
     }
+    // Montar payload apenas com campos que têm valor (Aegro não aceita undefined)
+    const payload: any = { name: s.iagruNome.trim() }
+    if (s.iagruNomeFantasia?.trim()) payload.tradeName = s.iagruNomeFantasia.trim()
+    if (s.iagruCpfCnpj?.trim()) payload.cpfCnpj = s.iagruCpfCnpj.trim()
+    if (s.iagruTelefone?.trim()) payload.phone = s.iagruTelefone.trim()
+    if (s.iagruUf?.trim()) payload.state = s.iagruUf.trim()
+    if (s.iagruCidade?.trim()) payload.city = s.iagruCidade.trim()
+
+    setPreviewData({ idx, sync: s, payload })
+    setShowPreviewModal(true)
+  }
+
+  // Confirmar envio após preview
+  const handleConfirmSendToAegro = async () => {
+    if (!previewData) return
+    const { idx, sync: s, payload } = previewData
+    setShowPreviewModal(false)
     setCompanySyncs(prev => prev.map((item, i) => i === idx ? { ...item, processing: true } : item))
     try {
-      // Montar payload apenas com campos que têm valor (Aegro não aceita undefined)
-      const payload: any = { name: s.iagruNome.trim() }
-      if (s.iagruNomeFantasia?.trim()) payload.tradeName = s.iagruNomeFantasia.trim()
-      if (s.iagruCpfCnpj?.trim()) payload.cpfCnpj = s.iagruCpfCnpj.trim()
-      if (s.iagruTelefone?.trim()) payload.phone = s.iagruTelefone.trim()
-      if (s.iagruUf?.trim()) payload.state = s.iagruUf.trim()
-      if (s.iagruCidade?.trim()) payload.city = s.iagruCidade.trim()
-
       const result = await aegroCreateCompany(token.trim(), payload)
       const newKey = result?.key || result?.companyKey || ''
       if (newKey) {
-        await upsertCadastroAegroKey(s.iagruId, newKey)
+        await upsertCadastroAegroKey(s.iagruId!, newKey)
         setCompanySyncs(prev => prev.map((item, i) => i === idx ? {
           ...item, aegroKey: newKey, aegroName: s.iagruNome, status: 'linked', processing: false, done: true, matchField: 'enviado',
         } : item))
@@ -712,6 +724,8 @@ export default function Integracoes() {
       console.error('Erro ao enviar para Aegro:', err)
       setCompanySyncs(prev => prev.map((item, i) => i === idx ? { ...item, processing: false, error: errorMsg } : item))
       toast.error(`Erro ao enviar: ${errorMsg}`)
+    } finally {
+      setPreviewData(null)
     }
   }
 
@@ -973,6 +987,150 @@ export default function Integracoes() {
       </p>
 
       {/* ========== MODAL MAPEAMENTO DE/PARA ========== */}
+      {/* ========== MODAL PREVIEW ANTES DE ENVIAR AO AEGRO ========== */}
+      {showPreviewModal && previewData && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 overflow-y-auto py-4 px-2">
+          <div className="bg-white rounded-xl shadow-2xl w-full max-w-3xl my-2">
+            {/* Header */}
+            <div className="flex items-center justify-between p-4 border-b bg-orange-50">
+              <div>
+                <h2 className="text-lg font-bold text-orange-800 flex items-center gap-2">
+                  <Upload className="w-5 h-5" /> Confirmar Envio ao Aegro
+                </h2>
+                <p className="text-sm text-orange-600 mt-0.5">Revise os dados antes de enviar</p>
+              </div>
+              <button onClick={() => { setShowPreviewModal(false); setPreviewData(null) }} className="p-2 hover:bg-orange-100 rounded-lg">
+                <X className="w-5 h-5 text-orange-700" />
+              </button>
+            </div>
+
+            {/* Mapeamento De → Para */}
+            <div className="p-4 space-y-4">
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                <p className="text-xs font-semibold text-blue-700 uppercase mb-2">Cadastro iAgru → Empresa Aegro</p>
+                <div className="grid grid-cols-[1fr_auto_1fr] gap-2 text-sm">
+                  <div className="text-right">
+                    <p className="font-semibold text-gray-700">iAgru</p>
+                  </div>
+                  <div className="flex items-center justify-center">
+                    <ArrowRight className="w-4 h-4 text-blue-500" />
+                  </div>
+                  <div>
+                    <p className="font-semibold text-gray-700">Aegro API</p>
+                  </div>
+
+                  {/* Nome */}
+                  <div className="text-right text-gray-600 border-t pt-2">
+                    <span className="text-xs text-gray-400">nome:</span> <span className="font-medium">{previewData.sync.iagruNome}</span>
+                  </div>
+                  <div className="flex items-center justify-center border-t pt-2">
+                    <ArrowRight className="w-3.5 h-3.5 text-gray-400" />
+                  </div>
+                  <div className="text-gray-600 border-t pt-2">
+                    <span className="text-xs text-gray-400">name:</span> <span className="font-medium">{previewData.payload.name}</span>
+                  </div>
+
+                  {/* Nome Fantasia */}
+                  {previewData.payload.tradeName && (
+                    <>
+                      <div className="text-right text-gray-600 border-t pt-2">
+                        <span className="text-xs text-gray-400">nome_fantasia:</span> <span className="font-medium">{previewData.sync.iagruNomeFantasia}</span>
+                      </div>
+                      <div className="flex items-center justify-center border-t pt-2">
+                        <ArrowRight className="w-3.5 h-3.5 text-gray-400" />
+                      </div>
+                      <div className="text-gray-600 border-t pt-2">
+                        <span className="text-xs text-gray-400">tradeName:</span> <span className="font-medium">{previewData.payload.tradeName}</span>
+                      </div>
+                    </>
+                  )}
+
+                  {/* CPF/CNPJ */}
+                  {previewData.payload.cpfCnpj && (
+                    <>
+                      <div className="text-right text-gray-600 border-t pt-2 font-mono text-xs">
+                        <span className="text-xs text-gray-400">cpf_cnpj:</span> <span className="font-medium">{previewData.sync.iagruCpfCnpj}</span>
+                      </div>
+                      <div className="flex items-center justify-center border-t pt-2">
+                        <ArrowRight className="w-3.5 h-3.5 text-gray-400" />
+                      </div>
+                      <div className="text-gray-600 border-t pt-2 font-mono text-xs">
+                        <span className="text-xs text-gray-400">cpfCnpj:</span> <span className="font-medium">{previewData.payload.cpfCnpj}</span>
+                      </div>
+                    </>
+                  )}
+
+                  {/* Telefone */}
+                  {previewData.payload.phone && (
+                    <>
+                      <div className="text-right text-gray-600 border-t pt-2">
+                        <span className="text-xs text-gray-400">telefone1:</span> <span className="font-medium">{previewData.sync.iagruTelefone}</span>
+                      </div>
+                      <div className="flex items-center justify-center border-t pt-2">
+                        <ArrowRight className="w-3.5 h-3.5 text-gray-400" />
+                      </div>
+                      <div className="text-gray-600 border-t pt-2">
+                        <span className="text-xs text-gray-400">phone:</span> <span className="font-medium">{previewData.payload.phone}</span>
+                      </div>
+                    </>
+                  )}
+
+                  {/* UF */}
+                  {previewData.payload.state && (
+                    <>
+                      <div className="text-right text-gray-600 border-t pt-2">
+                        <span className="text-xs text-gray-400">uf:</span> <span className="font-medium">{previewData.sync.iagruUf}</span>
+                      </div>
+                      <div className="flex items-center justify-center border-t pt-2">
+                        <ArrowRight className="w-3.5 h-3.5 text-gray-400" />
+                      </div>
+                      <div className="text-gray-600 border-t pt-2">
+                        <span className="text-xs text-gray-400">state:</span> <span className="font-medium">{previewData.payload.state}</span>
+                      </div>
+                    </>
+                  )}
+
+                  {/* Cidade */}
+                  {previewData.payload.city && (
+                    <>
+                      <div className="text-right text-gray-600 border-t pt-2">
+                        <span className="text-xs text-gray-400">cidade:</span> <span className="font-medium">{previewData.sync.iagruCidade}</span>
+                      </div>
+                      <div className="flex items-center justify-center border-t pt-2">
+                        <ArrowRight className="w-3.5 h-3.5 text-gray-400" />
+                      </div>
+                      <div className="text-gray-600 border-t pt-2">
+                        <span className="text-xs text-gray-400">city:</span> <span className="font-medium">{previewData.payload.city}</span>
+                      </div>
+                    </>
+                  )}
+                </div>
+              </div>
+
+              {/* JSON Preview */}
+              <div>
+                <p className="text-xs font-semibold text-gray-600 uppercase mb-2">Payload JSON (será enviado para POST /pub/v1/companies)</p>
+                <pre className="bg-gray-900 text-green-400 p-3 rounded-lg text-xs overflow-x-auto font-mono">
+{JSON.stringify(previewData.payload, null, 2)}
+                </pre>
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div className="flex items-center justify-end gap-2 p-4 border-t bg-gray-50">
+              <button onClick={() => { setShowPreviewModal(false); setPreviewData(null) }}
+                className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-100">
+                Cancelar
+              </button>
+              <button onClick={handleConfirmSendToAegro}
+                className="px-5 py-2 bg-orange-600 text-white rounded-lg text-sm font-medium hover:bg-orange-700 flex items-center gap-2">
+                <Upload className="w-4 h-4" /> Confirmar e Enviar ao Aegro
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* ========== MODAL SYNC CADASTROS ========== */}
       {showSyncCadModal && (
         <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/40 overflow-y-auto py-2 px-2">
