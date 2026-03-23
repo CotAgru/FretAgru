@@ -5,22 +5,30 @@ import {
   getTiposNf, createTipoNf, updateTipoNf, deleteTipoNf,
   getTiposTicket, createTipoTicket, updateTipoTicket, deleteTipoTicket,
   getTiposCaminhao, createTipoCaminhao, updateTipoCaminhao, deleteTipoCaminhao,
+  getUnidadesMedida, createUnidadeMedida, updateUnidadeMedida, deleteUnidadeMedida,
+  getTiposContrato, createTipoContrato, updateTipoContrato, deleteTipoContrato,
 } from '../services/api'
-import { fmtInt } from '../utils/format'
+import { fmtInt, fmtDec } from '../utils/format'
 
-type Tab = 'tipos_nf' | 'tipos_ticket' | 'tipos_caminhao'
+type Tab = 'tipos_nf' | 'tipos_ticket' | 'tipos_caminhao' | 'unidades_medida' | 'tipos_contrato'
 
 const TABS: { key: Tab; label: string }[] = [
   { key: 'tipos_nf', label: 'Tipo NF' },
   { key: 'tipos_ticket', label: 'Tipo Ticket' },
   { key: 'tipos_caminhao', label: 'Tipo Caminhão' },
+  { key: 'unidades_medida', label: 'Unidade de Medida' },
+  { key: 'tipos_contrato', label: 'Tipo Contrato Venda' },
 ]
 
+const GRUPOS_UNIDADE = ['sólido', 'líquido', 'unitário']
+
 function SimpleTable({
-  items, loading, onAdd, onEdit, onDelete, label, showExtraColumns,
+  items, loading, onAdd, onEdit, onDelete, label, extraColumns,
 }: {
-  items: any[]; loading: boolean; onAdd: () => void; onEdit: (item: any) => void; onDelete: (id: string) => void; label: string; showExtraColumns?: boolean;
+  items: any[]; loading: boolean; onAdd: () => void; onEdit: (item: any) => void; onDelete: (id: string) => void; label: string;
+  extraColumns?: { key: string; label: string; align?: string; render: (item: any) => React.ReactNode }[];
 }) {
+  const cols = extraColumns || []
   return (
     <div>
       <div className="flex items-center justify-between mb-4">
@@ -30,17 +38,14 @@ function SimpleTable({
         </button>
       </div>
       {loading ? <p className="text-gray-400 text-sm">Carregando...</p> : (
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200">
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-x-auto">
           <table className="w-full text-sm">
             <thead className="bg-gray-50 border-b">
               <tr>
                 <th className="text-left px-4 py-3 font-semibold text-gray-600">Nome</th>
-                {showExtraColumns && (
-                  <>
-                    <th className="text-center px-4 py-3 font-semibold text-gray-600 w-24">Eixos</th>
-                    <th className="text-center px-4 py-3 font-semibold text-gray-600 w-32">Peso Pauta (kg)</th>
-                  </>
-                )}
+                {cols.map(c => (
+                  <th key={c.key} className={`px-4 py-3 font-semibold text-gray-600 ${c.align === 'right' ? 'text-right' : 'text-center'} w-32`}>{c.label}</th>
+                ))}
                 <th className="text-center px-4 py-3 font-semibold text-gray-600 w-20">Ativo</th>
                 <th className="text-right px-4 py-3 font-semibold text-gray-600 w-24">Ações</th>
               </tr>
@@ -49,12 +54,9 @@ function SimpleTable({
               {items.map((item: any) => (
                 <tr key={item.id} className="hover:bg-gray-50">
                   <td className="px-4 py-3 font-medium">{item.nome}</td>
-                  {showExtraColumns && (
-                    <>
-                      <td className="px-4 py-3 text-center text-gray-600">{item.eixos || 0}</td>
-                      <td className="px-4 py-3 text-center text-gray-600">{fmtInt(item.peso_pauta_kg || 0)}</td>
-                    </>
-                  )}
+                  {cols.map(c => (
+                    <td key={c.key} className={`px-4 py-3 text-gray-600 ${c.align === 'right' ? 'text-right' : 'text-center'}`}>{c.render(item)}</td>
+                  ))}
                   <td className="px-4 py-3 text-center">
                     <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${item.ativo ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
                       {item.ativo ? 'Sim' : 'Não'}
@@ -66,7 +68,7 @@ function SimpleTable({
                   </td>
                 </tr>
               ))}
-              {items.length === 0 && <tr><td colSpan={showExtraColumns ? 5 : 3} className="px-4 py-8 text-center text-gray-400">Nenhum registro</td></tr>}
+              {items.length === 0 && <tr><td colSpan={2 + cols.length + 1} className="px-4 py-8 text-center text-gray-400">Nenhum registro</td></tr>}
             </tbody>
           </table>
         </div>
@@ -80,6 +82,8 @@ export default function Admin() {
   const [tiposNf, setTiposNf] = useState<any[]>([])
   const [tiposTicket, setTiposTicket] = useState<any[]>([])
   const [tiposCaminhao, setTiposCaminhao] = useState<any[]>([])
+  const [unidadesMedida, setUnidadesMedida] = useState<any[]>([])
+  const [tiposContrato, setTiposContrato] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
 
   const [showForm, setShowForm] = useState(false)
@@ -88,35 +92,58 @@ export default function Admin() {
   const [formAtivo, setFormAtivo] = useState(true)
   const [formEixos, setFormEixos] = useState(0)
   const [formPesoPauta, setFormPesoPauta] = useState(0)
+  // Unidade de Medida
+  const [formSimbolo, setFormSimbolo] = useState('')
+  const [formGrupo, setFormGrupo] = useState('sólido')
+  const [formFatorConversao, setFormFatorConversao] = useState('1')
+  const [formDescricao, setFormDescricao] = useState('')
+  // Tipo Contrato
+  const [formCor, setFormCor] = useState('')
   const [saving, setSaving] = useState(false)
 
   const load = () => {
     setLoading(true)
-    Promise.all([getTiposNf(), getTiposTicket(), getTiposCaminhao()])
-      .then(([tn, tt, tc]) => { setTiposNf(tn); setTiposTicket(tt); setTiposCaminhao(tc) })
+    Promise.all([getTiposNf(), getTiposTicket(), getTiposCaminhao(), getUnidadesMedida().catch(() => []), getTiposContrato().catch(() => [])])
+      .then(([tn, tt, tc, um, tcon]) => { setTiposNf(tn); setTiposTicket(tt); setTiposCaminhao(tc); setUnidadesMedida(um); setTiposContrato(tcon) })
       .catch(() => toast.error('Erro ao carregar'))
       .finally(() => setLoading(false))
   }
   useEffect(() => { load() }, [])
 
   const openNew = () => { 
-    setEditing(null); setFormNome(''); setFormAtivo(true); setFormEixos(0); setFormPesoPauta(0); setShowForm(true) 
+    setEditing(null); setFormNome(''); setFormAtivo(true); setFormEixos(0); setFormPesoPauta(0)
+    setFormSimbolo(''); setFormGrupo('sólido'); setFormFatorConversao('1'); setFormDescricao('')
+    setFormCor(''); setShowForm(true) 
   }
   const openEdit = (item: any) => { 
     setEditing(item); setFormNome(item.nome); setFormAtivo(item.ativo)
-    setFormEixos(item.eixos || 0); setFormPesoPauta(item.peso_pauta_kg || 0); setShowForm(true) 
+    setFormEixos(item.eixos || 0); setFormPesoPauta(item.peso_pauta_kg || 0)
+    setFormSimbolo(item.simbolo || ''); setFormGrupo(item.grupo || 'sólido')
+    setFormFatorConversao(item.fator_conversao != null ? String(item.fator_conversao) : '1')
+    setFormDescricao(item.descricao || ''); setFormCor(item.cor || '')
+    setShowForm(true) 
   }
 
   const save = async () => {
     if (!formNome.trim()) { toast.error('Nome é obrigatório'); return }
     if (tab === 'tipos_caminhao' && formEixos < 0) { toast.error('Eixos deve ser >= 0'); return }
     if (tab === 'tipos_caminhao' && formPesoPauta < 0) { toast.error('Peso pauta deve ser >= 0'); return }
+    if (tab === 'unidades_medida' && !formSimbolo.trim()) { toast.error('Símbolo é obrigatório'); return }
+    if (tab === 'unidades_medida' && !formGrupo) { toast.error('Grupo é obrigatório'); return }
     setSaving(true)
     try {
       const payload: any = { nome: formNome.trim(), ativo: formAtivo }
       if (tab === 'tipos_caminhao') {
         payload.eixos = formEixos
         payload.peso_pauta_kg = formPesoPauta
+      } else if (tab === 'unidades_medida') {
+        payload.simbolo = formSimbolo.trim()
+        payload.grupo = formGrupo
+        payload.fator_conversao = parseFloat(formFatorConversao.replace(',', '.')) || 1
+        payload.descricao = formDescricao || null
+      } else if (tab === 'tipos_contrato') {
+        payload.descricao = formDescricao || null
+        payload.cor = formCor || null
       }
       if (tab === 'tipos_nf') {
         if (editing) await updateTipoNf(editing.id, payload)
@@ -124,9 +151,15 @@ export default function Admin() {
       } else if (tab === 'tipos_ticket') {
         if (editing) await updateTipoTicket(editing.id, payload)
         else await createTipoTicket(payload)
-      } else {
+      } else if (tab === 'tipos_caminhao') {
         if (editing) await updateTipoCaminhao(editing.id, payload)
         else await createTipoCaminhao(payload)
+      } else if (tab === 'unidades_medida') {
+        if (editing) await updateUnidadeMedida(editing.id, payload)
+        else await createUnidadeMedida(payload)
+      } else if (tab === 'tipos_contrato') {
+        if (editing) await updateTipoContrato(editing.id, payload)
+        else await createTipoContrato(payload)
       }
       toast.success(editing ? 'Atualizado!' : 'Criado!')
       setShowForm(false); load()
@@ -139,13 +172,32 @@ export default function Admin() {
     try {
       if (tab === 'tipos_nf') await deleteTipoNf(id)
       else if (tab === 'tipos_ticket') await deleteTipoTicket(id)
-      else await deleteTipoCaminhao(id)
+      else if (tab === 'tipos_caminhao') await deleteTipoCaminhao(id)
+      else if (tab === 'unidades_medida') await deleteUnidadeMedida(id)
+      else if (tab === 'tipos_contrato') await deleteTipoContrato(id)
       toast.success('Removido!'); load()
     } catch { toast.error('Erro ao remover') }
   }
 
-  const currentItems = tab === 'tipos_nf' ? tiposNf : tab === 'tipos_ticket' ? tiposTicket : tiposCaminhao
+  const currentItems = tab === 'tipos_nf' ? tiposNf : tab === 'tipos_ticket' ? tiposTicket : tab === 'tipos_caminhao' ? tiposCaminhao : tab === 'unidades_medida' ? unidadesMedida : tiposContrato
   const currentLabel = TABS.find(t => t.key === tab)?.label || ''
+
+  const extraColumns = tab === 'tipos_caminhao'
+    ? [
+        { key: 'eixos', label: 'Eixos', render: (item: any) => item.eixos || 0 },
+        { key: 'peso_pauta_kg', label: 'Peso Pauta (kg)', render: (item: any) => fmtInt(item.peso_pauta_kg || 0) },
+      ]
+    : tab === 'unidades_medida'
+    ? [
+        { key: 'simbolo', label: 'Símbolo', render: (item: any) => <span className="font-mono font-bold text-blue-700">{item.simbolo}</span> },
+        { key: 'grupo', label: 'Grupo', render: (item: any) => <span className="capitalize">{item.grupo}</span> },
+        { key: 'fator_conversao', label: 'Fator Conversão', align: 'right' as const, render: (item: any) => fmtDec(item.fator_conversao, 6) },
+      ]
+    : tab === 'tipos_contrato'
+    ? [
+        { key: 'descricao', label: 'Descrição', render: (item: any) => item.descricao || '-' },
+      ]
+    : undefined
 
   return (
     <div>
@@ -176,7 +228,7 @@ export default function Admin() {
         onEdit={openEdit}
         onDelete={remove}
         label={currentLabel}
-        showExtraColumns={tab === 'tipos_caminhao'}
+        extraColumns={extraColumns}
       />
 
       {/* Modal */}
@@ -191,7 +243,7 @@ export default function Admin() {
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Nome *</label>
                 <input type="text" value={formNome} onChange={e => setFormNome(e.target.value)} autoFocus
-                  placeholder={tab === 'tipos_caminhao' ? 'Ex: Carreta' : 'Ex: Remessa para Depósito'}
+                  placeholder={tab === 'tipos_caminhao' ? 'Ex: Carreta' : tab === 'unidades_medida' ? 'Ex: Quilograma' : tab === 'tipos_contrato' ? 'Ex: Fixo' : 'Ex: Remessa para Depósito'}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent" />
               </div>
               {tab === 'tipos_caminhao' && (
@@ -206,6 +258,48 @@ export default function Admin() {
                     <label className="block text-sm font-medium text-gray-700 mb-1">Peso Pauta (kg) *</label>
                     <input type="number" value={formPesoPauta} onChange={e => setFormPesoPauta(Number(e.target.value))} min="0"
                       placeholder="Ex: 30000"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent" />
+                  </div>
+                </>
+              )}
+              {tab === 'unidades_medida' && (
+                <>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Símbolo *</label>
+                      <input type="text" value={formSimbolo} onChange={e => setFormSimbolo(e.target.value)}
+                        placeholder="Ex: kg, tn, lt"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent" />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Grupo *</label>
+                      <select value={formGrupo} onChange={e => setFormGrupo(e.target.value)}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent">
+                        {GRUPOS_UNIDADE.map(g => <option key={g} value={g}>{g}</option>)}
+                      </select>
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Fator de Conversão *</label>
+                    <input type="text" value={formFatorConversao} onChange={e => setFormFatorConversao(e.target.value)}
+                      placeholder="Ex: 1000 (1 tn = 1000 kg)"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent" />
+                    <p className="text-xs text-gray-400 mt-1">Quantas unidades base equivalem a 1 desta unidade (ex: 1 tn = 1.000 kg → fator = 1000)</p>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Descrição</label>
+                    <input type="text" value={formDescricao} onChange={e => setFormDescricao(e.target.value)}
+                      placeholder="Ex: 1 tonelada = 1000 kg"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent" />
+                  </div>
+                </>
+              )}
+              {tab === 'tipos_contrato' && (
+                <>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Descrição</label>
+                    <input type="text" value={formDescricao} onChange={e => setFormDescricao(e.target.value)}
+                      placeholder="Ex: Contrato com preço fixado"
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent" />
                   </div>
                 </>

@@ -7,7 +7,7 @@ import MultiSearchableSelect from '../components/MultiSearchableSelect'
 import InfoTooltip from '../components/InfoTooltip'
 import { useSort } from '../hooks/useSort'
 import SortHeader from '../components/SortHeader'
-import { fmtBRL, fmtDec, fmtData } from '../utils/format'
+import { fmtBRL, fmtDec, fmtData, fmtNumInput, parseNumInput, handleDecInput, handleIntInput } from '../utils/format'
 import { exportToExcel } from '../utils/export'
 
 const STATUS_OPTIONS = [
@@ -82,10 +82,10 @@ export default function CompraInsumos() {
       ano_safra_id: item.ano_safra_id || '',
       safra_ids: item.safra_ids || [],
       tipo_contrato_id: item.tipo_contrato_id || '',
-      quantidade: item.quantidade != null ? String(item.quantidade) : '',
+      quantidade: item.quantidade != null ? fmtNumInput(item.quantidade) : '',
       unidade_medida_id: item.unidade_medida_id || '',
-      valor_unitario: item.valor_unitario != null ? String(item.valor_unitario) : '',
-      valor_total: item.valor_total != null ? String(item.valor_total) : '',
+      valor_unitario: item.valor_unitario != null ? fmtNumInput(item.valor_unitario, 2) : '',
+      valor_total: item.valor_total != null ? fmtNumInput(item.valor_total, 2) : '',
       data_contrato: item.data_contrato || '', data_entrega_prevista: item.data_entrega_prevista || '',
       status: item.status || 'pendente', observacoes: item.observacoes || '', ativo: item.ativo,
       arquivo_url: item.arquivo_url || '',
@@ -143,8 +143,8 @@ export default function CompraInsumos() {
     try {
       const arquivoUrl = await uploadFile()
       
-      const quantidade = parseFloat(form.quantidade)
-      const valorUnitario = parseFloat(form.valor_unitario)
+      const quantidade = parseNumInput(form.quantidade) || 0
+      const valorUnitario = parseNumInput(form.valor_unitario) || 0
       const valorTotal = quantidade * valorUnitario
       
       const { safra_ids, ...formRest } = form
@@ -371,12 +371,15 @@ export default function CompraInsumos() {
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Quantidade *</label>
-                  <input type="number" step="0.01" value={form.quantidade}
+                  <input type="text" inputMode="decimal" value={form.quantidade}
                     onChange={e => {
-                      const q = e.target.value
-                      const vTotal = q && form.valor_unitario ? (parseFloat(q) * parseFloat(form.valor_unitario)).toFixed(2) : ''
+                      const q = handleIntInput(e.target.value)
+                      const qNum = parseNumInput(q)
+                      const vuNum = parseNumInput(form.valor_unitario)
+                      const vTotal = qNum && vuNum ? fmtNumInput(qNum * vuNum, 2) : ''
                       setForm(f => ({ ...f, quantidade: q, valor_total: vTotal }))
                     }}
+                    placeholder="600.000"
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent" />
                 </div>
                 <div>
@@ -390,12 +393,15 @@ export default function CompraInsumos() {
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Valor un *</label>
-                  <input type="number" step="0.01" value={form.valor_unitario}
+                  <input type="text" inputMode="decimal" value={form.valor_unitario}
                     onChange={e => {
-                      const vu = e.target.value
-                      const vTotal = vu && form.quantidade ? (parseFloat(form.quantidade) * parseFloat(vu)).toFixed(2) : ''
+                      const vu = handleDecInput(e.target.value)
+                      const vuNum = parseNumInput(vu)
+                      const qNum = parseNumInput(form.quantidade)
+                      const vTotal = vuNum && qNum ? fmtNumInput(qNum * vuNum, 2) : ''
                       setForm(f => ({ ...f, valor_unitario: vu, valor_total: vTotal }))
                     }}
+                    placeholder="0,00"
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent" />
                 </div>
                 <div>

@@ -101,3 +101,56 @@ export const fmtKm = (v: string | number | null | undefined): string => {
   const formatted = fmtInt(v)
   return formatted ? `${formatted} km` : ''
 }
+
+/**
+ * Formatar número para exibição em input (pt-BR): 600000 → "600.000"
+ * Aceita number ou string bruta. Para decimais: 1234.56 → "1.234,56"
+ */
+export const fmtNumInput = (v: string | number | null | undefined, decimals = 0): string => {
+  if (v === null || v === undefined || v === '') return ''
+  const n = typeof v === 'number' ? v : parseFloat(String(v).replace(/\./g, '').replace(',', '.'))
+  if (isNaN(n)) return ''
+  return n.toLocaleString('pt-BR', { minimumFractionDigits: decimals, maximumFractionDigits: decimals })
+}
+
+/**
+ * Parse string formatada pt-BR → number: "600.000" → 600000, "1.234,56" → 1234.56
+ */
+export const parseNumInput = (v: string): number | null => {
+  if (!v || v.trim() === '') return null
+  const cleaned = v.replace(/\./g, '').replace(',', '.')
+  const n = parseFloat(cleaned)
+  return isNaN(n) ? null : n
+}
+
+/**
+ * Handler para input numérico inteiro formatado (pt-BR).
+ * Permite apenas dígitos, formata com separador de milhar.
+ */
+export const handleIntInput = (raw: string): string => {
+  const digits = raw.replace(/\D/g, '')
+  if (!digits) return ''
+  return parseInt(digits, 10).toLocaleString('pt-BR')
+}
+
+/**
+ * Handler para input numérico decimal formatado (pt-BR).
+ * Permite dígitos e vírgula como separador decimal.
+ * Ex: digitando "1234,56" → formata para "1.234,56"
+ */
+export const handleDecInput = (raw: string): string => {
+  // Remove tudo exceto dígitos e vírgula
+  let cleaned = raw.replace(/[^\d,]/g, '')
+  // Permitir apenas uma vírgula
+  const parts = cleaned.split(',')
+  if (parts.length > 2) cleaned = parts[0] + ',' + parts.slice(1).join('')
+  if (!cleaned || cleaned === ',') return ''
+  
+  const intPart = parts[0].replace(/^0+(?=\d)/, '') || '0'
+  const decPart = parts.length > 1 ? parts[1] : null
+  
+  // Formatar parte inteira com separador de milhar
+  const intFormatted = intPart ? parseInt(intPart || '0', 10).toLocaleString('pt-BR') : '0'
+  
+  return decPart !== null ? `${intFormatted},${decPart}` : intFormatted
+}
