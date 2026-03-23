@@ -223,6 +223,12 @@ export default function ContratosVenda() {
     return (quantidade * fatorOrigem) / unidadeDestino.fator_conversao
   }
 
+  const convertPrice = (precoUnitario: number, fatorOrigem: number, simboloDestino: string) => {
+    const unidadeDestino = unidadesMedida.find(u => u.simbolo === simboloDestino)
+    if (!unidadeDestino) return precoUnitario
+    return (precoUnitario * unidadeDestino.fator_conversao) / fatorOrigem
+  }
+
   const visibleColumns = columns.filter(c => c.visible).sort((a, b) => a.order - b.order)
 
   const toggleColumn = (key: string) => {
@@ -340,7 +346,10 @@ export default function ContratosVenda() {
                     const volumeConvertido = convertVolume(item.volume_tons || 0, item.unidade_fator || 1, unidadeExibicao)
                     return <td key={col.key} className="px-4 py-3 text-right font-medium">{fmtDec(volumeConvertido, 2)}</td>
                   }
-                  if (col.key === 'preco_valor') return <td key={col.key} className="px-4 py-3 text-right">{fmtBRL(item.preco_valor)} <span className="text-xs text-gray-400">{item.preco_unidade}</span></td>
+                  if (col.key === 'preco_valor') {
+                    const precoConvertido = convertPrice(item.preco_valor || 0, item.unidade_fator || 1, unidadeExibicao)
+                    return <td key={col.key} className="px-4 py-3 text-right">{fmtBRL(precoConvertido)} <span className="text-xs text-gray-400">/{unidadeExibicao}</span></td>
+                  }
                   if (col.key === 'modalidade') return <td key={col.key} className="px-4 py-3 text-center text-xs font-medium">{item.modalidade}</td>
                   if (col.key === 'status') return <td key={col.key} className="px-4 py-3">{getStatusBadge(item.status)}</td>
                   return <td key={col.key} className="px-4 py-3">-</td>
