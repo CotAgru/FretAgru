@@ -289,11 +289,8 @@ export default function CompraInsumos() {
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Ano Safra</label>
-                  <select value={form.ano_safra} onChange={e => setForm(f => ({ ...f, ano_safra: e.target.value, safra_id: '' }))}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent">
-                    <option value="">Todos</option>
-                    {anosSafra.map((ano: number) => <option key={ano} value={String(ano)}>{ano}</option>)}
-                  </select>
+                  <SearchableSelect value={form.ano_safra} onChange={val => setForm(f => ({ ...f, ano_safra: val, safra_id: '' }))}
+                    options={[{ value: '', label: 'Todos' }, ...anosSafra.map((ano: number) => ({ value: String(ano), label: String(ano) }))]} placeholder="Ano Safra" />
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Safra</label>
@@ -332,10 +329,8 @@ export default function CompraInsumos() {
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
-                  <select value={form.status} onChange={e => setForm(f => ({ ...f, status: e.target.value }))}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent">
-                    {STATUS_OPTIONS.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
-                  </select>
+                  <SearchableSelect value={form.status} onChange={val => setForm(f => ({ ...f, status: val }))}
+                    options={STATUS_OPTIONS.map(s => ({ value: s.value, label: s.label }))} placeholder="Status" />
                 </div>
               </div>
 

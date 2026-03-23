@@ -975,12 +975,8 @@ Use 0 para campos numéricos não encontrados e "" para textos. Pesos em KG inte
                 </div>
                 <div>
                   <label className="block text-xs font-medium text-gray-700 mb-1">Transgenia</label>
-                  <select value={form.transgenia} onChange={e => setForm({...form, transgenia: e.target.value})}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm">
-                    <option value="">Selecione...</option>
-                    <option value="Sim">Sim</option>
-                    <option value="Não">Não</option>
-                  </select>
+                  <SearchableSelect value={form.transgenia} onChange={val => setForm({...form, transgenia: val})}
+                    options={[{ value: '', label: 'Selecione...' }, { value: 'Sim', label: 'Sim' }, { value: 'Não', label: 'Não' }]} placeholder="Transgenia" />
                 </div>
               </div>
 
