@@ -130,16 +130,26 @@ export default function CompraInsumos() {
       formData.append('bucket', 'contratosdecompra-img')
       formData.append('fileName', fileName)
       
+      console.log('Enviando arquivo:', { bucket: 'contratosdecompra-img', fileName })
+      
       const resp = await fetch('/api/upload-file', {
         method: 'POST',
         body: formData
       })
       
-      if (!resp.ok) throw new Error('Erro ao fazer upload')
       const data = await resp.json()
+      console.log('Resposta da API:', data)
+      
+      if (!resp.ok) {
+        const errorMsg = data.error || data.message || `HTTP ${resp.status}`
+        throw new Error(errorMsg)
+      }
+      
+      toast.success('Arquivo enviado com sucesso!')
       return data.publicUrl
     } catch (err: any) {
-      toast.error('Erro ao fazer upload: ' + (err?.message || ''))
+      console.error('Erro no upload:', err)
+      toast.error(`Erro ao enviar arquivo: ${err?.message || 'Erro desconhecido'}`)
       return null
     } finally {
       setUploadingFile(false)
