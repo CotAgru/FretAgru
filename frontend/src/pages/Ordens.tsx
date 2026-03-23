@@ -939,36 +939,24 @@ export default function Ordens() {
               <div className="grid grid-cols-2 gap-2">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Origem *</label>
-                  <select value={miniPrecoForm.origem_id} onChange={e => setMiniPrecoForm({...miniPrecoForm, origem_id: e.target.value})}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent text-sm">
-                    <option value="">Selecione...</option>
-                    {origens.map((l: any) => <option key={l.id} value={l.id}>{l.nome_fantasia || l.nome}</option>)}
-                  </select>
+                  <SearchableSelect value={miniPrecoForm.origem_id} onChange={val => setMiniPrecoForm({...miniPrecoForm, origem_id: val})}
+                    options={[{ value: '', label: 'Selecione...' }, ...origens.map((l: any) => ({ value: l.id, label: l.nome_fantasia || l.nome }))]} placeholder="Origem" />
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Destino *</label>
-                  <select value={miniPrecoForm.destino_id} onChange={e => setMiniPrecoForm({...miniPrecoForm, destino_id: e.target.value})}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent text-sm">
-                    <option value="">Selecione...</option>
-                    {origens.map((l: any) => <option key={l.id} value={l.id}>{l.nome_fantasia || l.nome}</option>)}
-                  </select>
+                  <SearchableSelect value={miniPrecoForm.destino_id} onChange={val => setMiniPrecoForm({...miniPrecoForm, destino_id: val})}
+                    options={[{ value: '', label: 'Selecione...' }, ...origens.map((l: any) => ({ value: l.id, label: l.nome_fantasia || l.nome }))]} placeholder="Destino" />
                 </div>
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Produto *</label>
-                <select value={miniPrecoForm.produto_id} onChange={e => setMiniPrecoForm({...miniPrecoForm, produto_id: e.target.value})}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent">
-                  <option value="">Selecione...</option>
-                  {produtos.map((p: any) => <option key={p.id} value={p.id}>{p.nome}</option>)}
-                </select>
+                <SearchableSelect value={miniPrecoForm.produto_id} onChange={val => setMiniPrecoForm({...miniPrecoForm, produto_id: val})}
+                  options={[{ value: '', label: 'Selecione...' }, ...produtos.map((p: any) => ({ value: p.id, label: p.nome }))]} placeholder="Produto" />
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Transportador</label>
-                <select value={miniPrecoForm.fornecedor_id} onChange={e => setMiniPrecoForm({...miniPrecoForm, fornecedor_id: e.target.value})}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent">
-                  <option value="">Todos (preco geral)</option>
-                  {transportadoras.map((t: any) => <option key={t.id} value={t.id}>{t.nome_fantasia || t.nome}</option>)}
-                </select>
+                <SearchableSelect value={miniPrecoForm.fornecedor_id} onChange={val => setMiniPrecoForm({...miniPrecoForm, fornecedor_id: val})}
+                  options={[{ value: '', label: 'Todos (preço geral)' }, ...transportadoras.map((t: any) => ({ value: t.id, label: t.nome_fantasia || t.nome }))]} placeholder="Transportador" />
               </div>
               <div className="grid grid-cols-2 gap-2">
                 <div>
@@ -979,10 +967,8 @@ export default function Ordens() {
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Unidade</label>
-                  <select value={miniPrecoForm.unidade_preco} onChange={e => setMiniPrecoForm({...miniPrecoForm, unidade_preco: e.target.value})}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent">
-                    <option value="R$/ton">R$/ton</option><option value="R$/sc">R$/sc</option><option value="R$/km">R$/km</option><option value="R$/viagem">R$/viagem</option>
-                  </select>
+                  <SearchableSelect value={miniPrecoForm.unidade_preco} onChange={val => setMiniPrecoForm({...miniPrecoForm, unidade_preco: val})}
+                    options={[{ value: 'R$/ton', label: 'R$/ton' }, { value: 'R$/sc', label: 'R$/sc' }, { value: 'R$/km', label: 'R$/km' }, { value: 'R$/viagem', label: 'R$/viagem' }]} placeholder="Unidade" />
                 </div>
               </div>
             </div>
