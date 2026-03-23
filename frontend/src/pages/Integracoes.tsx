@@ -249,6 +249,23 @@ export default function Integracoes() {
     }
   }
 
+  const [refreshingAll, setRefreshingAll] = useState(false)
+
+  const refreshAllSync = async () => {
+    if (!token.trim()) return
+    setRefreshingAll(true)
+    try {
+      await Promise.all([
+        loadSyncStats(token),
+        loadCadastroStats(token),
+      ])
+      toast.success('Dados atualizados!')
+    } catch {
+      toast.error('Erro ao atualizar dados')
+    }
+    setRefreshingAll(false)
+  }
+
   // Carregar stats quando conectado e token disponível
   useEffect(() => {
     if (aegro?.status === 'conectado' && token.trim()) {
@@ -1127,6 +1144,9 @@ export default function Integracoes() {
                 <p className="text-sm font-medium text-gray-700 flex items-center gap-1.5">
                   <BarChart3 className="w-4 h-4 text-green-600" /> Sincronização de dados
                 </p>
+                <button onClick={refreshAllSync} disabled={refreshingAll} className="text-xs text-gray-500 hover:text-green-600 flex items-center gap-1 px-2 py-1 rounded hover:bg-green-50 transition-colors disabled:opacity-50">
+                  <RefreshCw className={`w-3.5 h-3.5 ${refreshingAll ? 'animate-spin' : ''}`} /> {refreshingAll ? 'Atualizando...' : 'Atualizar tudo'}
+                </button>
               </div>
 
               {/* 1. SAFRAS (CROPS) */}
@@ -1135,11 +1155,6 @@ export default function Integracoes() {
                   <h3 className="text-sm font-semibold text-green-800 flex items-center gap-2">
                     🌾 Safras (Crops)
                   </h3>
-                  {syncStats && !syncStats.loading && (
-                    <button onClick={() => loadSyncStats(token)} className="text-[11px] text-gray-400 hover:text-green-600 flex items-center gap-1">
-                      <RefreshCw className="w-3 h-3" /> atualizar
-                    </button>
-                  )}
                 </div>
 
               {syncStats && (
