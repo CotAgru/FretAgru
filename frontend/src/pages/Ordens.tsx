@@ -3,6 +3,7 @@ import { Plus, Pencil, Trash2, X, Truck, User, Minus, Check, CarFront, Loader2, 
 import toast from 'react-hot-toast'
 import { getOrdens, createOrdem, updateOrdem, deleteOrdem, getCadastros, getProdutos, getVeiculos, getPrecos, getOrdemTransportadores, addOrdemTransportador, removeOrdemTransportador, getOperacoes, createCadastro, createProduto, createPreco } from '../services/api'
 import ViewModal, { Field, Section } from '../components/ViewModal'
+import SearchableSelect from '../components/SearchableSelect'
 import { useSort } from '../hooks/useSort'
 import SortHeader from '../components/SortHeader'
 import { fmtData, fmtDataHora, fmtInt, fmtDec } from '../utils/format'
@@ -618,11 +619,8 @@ export default function Ordens() {
               {/* Operacao */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Operacao</label>
-                <select value={form.operacao_id} onChange={e => setForm({...form, operacao_id: e.target.value})}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent">
-                  <option value="">Nenhuma (avulsa)</option>
-                  {operacoes.map((op: any) => <option key={op.id} value={op.id}>{op.nome}</option>)}
-                </select>
+                <SearchableSelect value={form.operacao_id} onChange={val => setForm({...form, operacao_id: val})}
+                  options={[{ value: '', label: 'Nenhuma (avulsa)' }, ...operacoes.map((op: any) => ({ value: op.id, label: op.nome }))]} placeholder="Operação" />
               </div>
 
               {/* Nome da Ordem */}
@@ -640,21 +638,13 @@ export default function Ordens() {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Origem *</label>
-                  <select value={form.origem_id} onChange={e => handleSelectChange('origem_id', e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent">
-                    <option value="">Selecione...</option>
-                    {origens.map((l: any) => <option key={l.id} value={l.id}>{l.nome_fantasia || l.nome}</option>)}
-                    <option value="__novo__" className="font-semibold text-green-700 bg-green-50">{NOVO_LABEL}</option>
-                  </select>
+                  <SearchableSelect value={form.origem_id} onChange={val => handleSelectChange('origem_id', val)}
+                    options={[{ value: '', label: 'Selecione...' }, ...origens.map((l: any) => ({ value: l.id, label: l.nome_fantasia || l.nome })), { value: '__novo__', label: NOVO_LABEL }]} placeholder="Origem" />
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Destino *</label>
-                  <select value={form.destino_id} onChange={e => handleSelectChange('destino_id', e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent">
-                    <option value="">Selecione...</option>
-                    {origens.map((l: any) => <option key={l.id} value={l.id}>{l.nome_fantasia || l.nome}</option>)}
-                    <option value="__novo__" className="font-semibold text-green-700 bg-green-50">{NOVO_LABEL}</option>
-                  </select>
+                  <SearchableSelect value={form.destino_id} onChange={val => handleSelectChange('destino_id', val)}
+                    options={[{ value: '', label: 'Selecione...' }, ...origens.map((l: any) => ({ value: l.id, label: l.nome_fantasia || l.nome })), { value: '__novo__', label: NOVO_LABEL }]} placeholder="Destino" />
                 </div>
               </div>
 
@@ -662,12 +652,8 @@ export default function Ordens() {
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Produto *</label>
-                  <select value={form.produto_id} onChange={e => handleSelectChange('produto_id', e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent">
-                    <option value="">Selecione...</option>
-                    {produtos.map((p: any) => <option key={p.id} value={p.id}>{p.nome}</option>)}
-                    <option value="__novo__" className="font-semibold text-green-700 bg-green-50">{NOVO_PROD_LABEL}</option>
-                  </select>
+                  <SearchableSelect value={form.produto_id} onChange={val => handleSelectChange('produto_id', val)}
+                    options={[{ value: '', label: 'Selecione...' }, ...produtos.map((p: any) => ({ value: p.id, label: p.nome })), { value: '__novo__', label: NOVO_PROD_LABEL }]} placeholder="Produto" />
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Qtd Prevista</label>
@@ -676,10 +662,8 @@ export default function Ordens() {
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Unidade</label>
-                  <select value={form.unidade} onChange={e => setForm({...form, unidade: e.target.value})}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent">
-                    <option value="ton">ton</option><option value="sc">sc</option><option value="kg">kg</option>
-                  </select>
+                  <SearchableSelect value={form.unidade} onChange={val => setForm({...form, unidade: val})}
+                    options={[{ value: 'ton', label: 'ton' }, { value: 'sc', label: 'sc' }, { value: 'kg', label: 'kg' }]} placeholder="Unidade" />
                 </div>
               </div>
 
@@ -688,12 +672,8 @@ export default function Ordens() {
                 <label className="block text-sm font-medium text-gray-700 mb-1">Preco Contratado (vinculo)
                   {form.origem_id && form.destino_id && <span className="text-xs text-green-600 ml-1">filtrado pela rota</span>}
                 </label>
-                <select value={form.preco_id} onChange={e => handleSelectChange('preco_id', e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent">
-                  <option value="">Nenhum</option>
-                  {precosFiltrados.map((p: any) => <option key={p.id} value={p.id}>{p.origem_nome} → {p.destino_nome} | {p.produto_nome} | {p.valor} {p.unidade_preco}</option>)}
-                  <option value="__novo__" className="font-semibold text-green-700 bg-green-50">{NOVO_PRECO_LABEL}</option>
-                </select>
+                <SearchableSelect value={form.preco_id} onChange={val => handleSelectChange('preco_id', val)}
+                  options={[{ value: '', label: 'Nenhum' }, ...precosFiltrados.map((p: any) => ({ value: p.id, label: `${p.origem_nome} → ${p.destino_nome} | ${p.produto_nome} | ${p.valor} ${p.unidade_preco}` })), { value: '__novo__', label: NOVO_PRECO_LABEL }]} placeholder="Preço contratado" />
                 {form.origem_id && form.destino_id && precosFiltrados.length === 0 && (
                   <p className="text-xs text-amber-600 mt-1">Nenhum preco cadastrado para esta rota.</p>
                 )}
@@ -723,30 +703,15 @@ export default function Ordens() {
                   {/* Selecionar transportadora - ao selecionar, vincula automaticamente motoristas+placas */}
                   <div className="mb-3">
                     <label className="block text-xs font-medium text-gray-600 mb-1">Adicionar Transportadora (vincula motoristas automaticamente)</label>
-                    <select value="" onChange={e => handleSelectTransp(e.target.value)}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm">
-                      <option value="">Selecionar Transportadora...</option>
-                      {transportadoras.map((t: any) => {
-                        const mots = allMotoristas.filter(m => m.transportador_id === t.id)
-                        return <option key={t.id} value={t.id}>{t.nome_fantasia || t.nome} ({mots.length} mot.)</option>
-                      })}
-                      <option value="__novo__" className="font-semibold text-green-700 bg-green-50">{NOVO_TRANSP_LABEL}</option>
-                    </select>
+                    <SearchableSelect value="" onChange={val => handleSelectTransp(val)}
+                      options={[{ value: '', label: 'Selecionar Transportadora...' }, ...transportadoras.map((t: any) => { const mots = allMotoristas.filter(m => m.transportador_id === t.id); return { value: t.id, label: `${t.nome_fantasia || t.nome} (${mots.length} mot.)` } }), { value: '__novo__', label: NOVO_TRANSP_LABEL }]} placeholder="Transportadora" />
                   </div>
 
                   {/* Adicionar motorista avulso */}
                   <div className="mb-3">
                     <label className="block text-xs font-medium text-gray-600 mb-1">Ou adicionar motorista avulso</label>
-                    <select value="" onChange={e => handleAddMotoristaAvulso(e.target.value)}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm">
-                      <option value="">Selecionar Motorista...</option>
-                      {allMotoristas.map((m: any) => {
-                        const veics = veiculos.filter((v: any) => v.cadastro_id === m.id)
-                        const placaStr = veics.map((v: any) => v.placa).join(', ')
-                        return <option key={m.id} value={m.id}>{m.nome_fantasia || m.nome}{placaStr ? ` [${placaStr}]` : ''}</option>
-                      })}
-                      <option value="__novo__" className="font-semibold text-green-700 bg-green-50">{NOVO_MOT_LABEL}</option>
-                    </select>
+                    <SearchableSelect value="" onChange={val => handleAddMotoristaAvulso(val)}
+                      options={[{ value: '', label: 'Selecionar Motorista...' }, ...allMotoristas.map((m: any) => { const veics = veiculos.filter((v: any) => v.cadastro_id === m.id); const placaStr = veics.map((v: any) => v.placa).join(', '); return { value: m.id, label: `${m.nome_fantasia || m.nome}${placaStr ? ` [${placaStr}]` : ''}` } }), { value: '__novo__', label: NOVO_MOT_LABEL }]} placeholder="Motorista" />
                   </div>
 
                   {/* Lista de vinculos */}
@@ -857,24 +822,17 @@ export default function Ordens() {
               <div className="grid grid-cols-3 gap-2">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">UF *</label>
-                  <select value={miniCadForm.uf}
-                    onChange={e => setMiniCadForm({...miniCadForm, uf: e.target.value, cidade: ''})}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent">
-                    <option value="">Selecione...</option>
-                    {popupUfs.map(u => <option key={u.id} value={u.sigla}>{u.sigla} - {u.nome}</option>)}
-                  </select>
+                  <SearchableSelect value={miniCadForm.uf}
+                    onChange={val => setMiniCadForm({...miniCadForm, uf: val, cidade: ''})}
+                    options={[{ value: '', label: 'Selecione...' }, ...popupUfs.map(u => ({ value: u.sigla, label: `${u.sigla} - ${u.nome}` }))]} placeholder="UF" />
                 </div>
                 <div className="col-span-2">
                   <label className="block text-sm font-medium text-gray-700 mb-1">
                     Cidade * {popupLoadingCidades && <Loader2 className="w-3 h-3 inline animate-spin ml-1" />}
                   </label>
-                  <select value={miniCadForm.cidade}
-                    onChange={e => setMiniCadForm({...miniCadForm, cidade: e.target.value})}
-                    disabled={popupLoadingCidades || popupCidades.length === 0}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent disabled:bg-gray-100">
-                    <option value="">Selecione...</option>
-                    {popupCidades.map(c => <option key={c.id} value={c.nome}>{c.nome}</option>)}
-                  </select>
+                  <SearchableSelect value={miniCadForm.cidade}
+                    onChange={val => setMiniCadForm({...miniCadForm, cidade: val})}
+                    options={[{ value: '', label: 'Selecione...' }, ...popupCidades.map(c => ({ value: c.nome, label: c.nome }))]} placeholder="Cidade" />
                 </div>
               </div>
 
@@ -900,11 +858,8 @@ export default function Ordens() {
               {popupContext === 'motorista' && (
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Transportadora vinculada</label>
-                  <select value={miniCadForm.transportador_id} onChange={e => setMiniCadForm({...miniCadForm, transportador_id: e.target.value})}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent">
-                    <option value="">Nenhuma</option>
-                    {transportadoras.map((t: any) => <option key={t.id} value={t.id}>{t.nome_fantasia || t.nome}</option>)}
-                  </select>
+                  <SearchableSelect value={miniCadForm.transportador_id} onChange={val => setMiniCadForm({...miniCadForm, transportador_id: val})}
+                    options={[{ value: '', label: 'Nenhuma' }, ...transportadoras.map((t: any) => ({ value: t.id, label: t.nome_fantasia || t.nome }))]} placeholder="Transportadora" />
                 </div>
               )}
 
@@ -945,17 +900,13 @@ export default function Ordens() {
               <div className="grid grid-cols-2 gap-2">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Tipo</label>
-                  <select value={miniProdForm.tipo} onChange={e => setMiniProdForm({...miniProdForm, tipo: e.target.value})}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent">
-                    <option value="Grao">Grao</option><option value="Insumo">Insumo</option>
-                  </select>
+                  <SearchableSelect value={miniProdForm.tipo} onChange={val => setMiniProdForm({...miniProdForm, tipo: val})}
+                    options={[{ value: 'Grao', label: 'Grao' }, { value: 'Insumo', label: 'Insumo' }]} placeholder="Tipo" />
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Unidade</label>
-                  <select value={miniProdForm.unidade_medida} onChange={e => setMiniProdForm({...miniProdForm, unidade_medida: e.target.value})}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent">
-                    <option value="ton">ton</option><option value="kg">kg</option><option value="sc">sc</option><option value="l">l</option>
-                  </select>
+                  <SearchableSelect value={miniProdForm.unidade_medida} onChange={val => setMiniProdForm({...miniProdForm, unidade_medida: val})}
+                    options={[{ value: 'ton', label: 'ton' }, { value: 'kg', label: 'kg' }, { value: 'sc', label: 'sc' }, { value: 'l', label: 'l' }]} placeholder="Unidade" />
                 </div>
               </div>
             </div>
