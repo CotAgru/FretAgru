@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react'
 import { Package, Plus, Pencil, Trash2, X, Loader2, Search, FileSpreadsheet, Upload, FileText } from 'lucide-react'
 import toast from 'react-hot-toast'
-import { getComprasInsumo, createCompraInsumo, updateCompraInsumo, deleteCompraInsumo, getCadastros, getProdutos, getSafras, getAnosSafra, getTiposContrato, getUnidadesMedida } from '../services/api'
+import { getComprasInsumo, createCompraInsumo, updateCompraInsumo, deleteCompraInsumo, getCadastros, getProdutos, getSafras, getAnosSafra, getTiposContrato, getUnidadesMedida, syncContratoCompraSafras } from '../services/api'
 import SearchableSelect from '../components/SearchableSelect'
+import MultiSearchableSelect from '../components/MultiSearchableSelect'
 import InfoTooltip from '../components/InfoTooltip'
 import { useSort } from '../hooks/useSort'
 import SortHeader from '../components/SortHeader'
@@ -20,7 +21,8 @@ const UNIDADES_MEDIDA = ['ton', 'kg', 'l', 'sc', 'un']
 const UNIDADES_PRECO = ['R$/ton', 'R$/kg', 'R$/l', 'R$/sc', 'R$/un']
 
 const emptyForm = {
-  numero_contrato: '', fornecedor_id: '', produto_id: '', safra_id: '', ano_safra_id: '',
+  numero_contrato: '', fornecedor_id: '', produto_id: '', ano_safra_id: '',
+  safra_ids: [] as string[],
   tipo_contrato_id: '', quantidade: '', unidade_medida_id: '', valor_unitario: '', valor_total: '',
   data_contrato: '', data_entrega_prevista: '', status: 'pendente',
   observacoes: '', ativo: true, arquivo_url: '',
@@ -77,7 +79,8 @@ export default function CompraInsumos() {
     setForm({
       numero_contrato: item.numero_contrato || '',
       fornecedor_id: item.fornecedor_id || '', produto_id: item.produto_id || '',
-      safra_id: item.safra_id || '', ano_safra_id: item.ano_safra_id || '',
+      ano_safra_id: item.ano_safra_id || '',
+      safra_ids: item.safra_ids || [],
       tipo_contrato_id: item.tipo_contrato_id || '',
       quantidade: item.quantidade != null ? String(item.quantidade) : '',
       unidade_medida_id: item.unidade_medida_id || '',
@@ -144,13 +147,13 @@ export default function CompraInsumos() {
       const valorUnitario = parseFloat(form.valor_unitario)
       const valorTotal = quantidade * valorUnitario
       
+      const { safra_ids, ...formRest } = form
       const payload: any = {
-        ...form,
+        ...formRest,
         quantidade,
         valor_unitario: valorUnitario,
         valor_total: valorTotal,
         ano_safra_id: form.ano_safra_id || null,
-        safra_id: form.safra_id || null,
         tipo_contrato_id: form.tipo_contrato_id || null,
         unidade_medida_id: form.unidade_medida_id || null,
         data_contrato: form.data_contrato || null,
@@ -159,8 +162,10 @@ export default function CompraInsumos() {
         numero_contrato: form.numero_contrato || null,
         arquivo_url: arquivoUrl || null,
       }
-      if (editing) await updateCompraInsumo(editing.id, payload)
-      else await createCompraInsumo(payload)
+      let result: any
+      if (editing) { result = await updateCompraInsumo(editing.id, payload) }
+      else { result = await createCompraInsumo(payload) }
+      await syncContratoCompraSafras(result.id, safra_ids)
       toast.success(editing ? 'Compra atualizada' : 'Compra cadastrada')
       setShowForm(false); load()
     } catch (err: any) { toast.error('Erro: ' + (err?.message || '')) }
@@ -179,7 +184,7 @@ export default function CompraInsumos() {
     return (i.fornecedor_nome || '').toLowerCase().includes(term) ||
       (i.produto_nome || '').toLowerCase().includes(term) ||
       (i.numero_contrato || '').toLowerCase().includes(term) ||
-      (i.safra_nome || '').toLowerCase().includes(term)
+      (i.safras_nomes || []).join(' ').toLowerCase().includes(term)
   })
 
   const { sortedData: sorted, sortKey, sortDirection, toggleSort } = useSort(filtered)
@@ -196,7 +201,7 @@ export default function CompraInsumos() {
         { key: 'numero_contrato', label: 'Nº Contrato' },
         { key: 'fornecedor_nome', label: 'Fornecedor' },
         { key: 'produto_nome', label: 'Produto' },
-        { key: 'safra_nome', label: 'Safra' },
+        { key: 'safras_nomes', label: 'Safras' },
         { key: 'quantidade', label: 'Quantidade' },
         { key: 'unidade_medida', label: 'Unidade' },
         { key: 'preco_valor', label: 'Preço' },
@@ -247,7 +252,7 @@ export default function CompraInsumos() {
               <SortHeader label="Nº" field="numero_contrato" sortKey={sortKey} sortDirection={sortDirection} onSort={toggleSort} />
               <SortHeader label="Fornecedor" field="fornecedor_nome" sortKey={sortKey} sortDirection={sortDirection} onSort={toggleSort} />
               <SortHeader label="Produto" field="produto_nome" sortKey={sortKey} sortDirection={sortDirection} onSort={toggleSort} />
-              <SortHeader label="Safra" field="safra_nome" sortKey={sortKey} sortDirection={sortDirection} onSort={toggleSort} />
+              <SortHeader label="Safras" field="safras_nomes" sortKey={sortKey} sortDirection={sortDirection} onSort={toggleSort} />
               <SortHeader label="Quantidade" field="quantidade" sortKey={sortKey} sortDirection={sortDirection} onSort={toggleSort} align="right" />
               <SortHeader label="Preço" field="preco_valor" sortKey={sortKey} sortDirection={sortDirection} onSort={toggleSort} align="right" />
               <SortHeader label="Entrega" field="data_entrega_prevista" sortKey={sortKey} sortDirection={sortDirection} onSort={toggleSort} />
@@ -261,7 +266,7 @@ export default function CompraInsumos() {
                 <td className="px-4 py-3 text-gray-600">{item.numero_contrato || '-'}</td>
                 <td className="px-4 py-3 font-medium">{item.fornecedor_nome}</td>
                 <td className="px-4 py-3 text-gray-600">{item.produto_nome}</td>
-                <td className="px-4 py-3 text-gray-600">{item.safra_nome || '-'}</td>
+                <td className="px-4 py-3 text-gray-600">{item.safras_nomes?.length > 0 ? item.safras_nomes.join(', ') : '-'}</td>
                 <td className="px-4 py-3 text-right">{fmtDec(item.quantidade, 2)} <span className="text-xs text-gray-400">{item.unidade_medida}</span></td>
                 <td className="px-4 py-3 text-right">{fmtBRL(item.preco_valor)} <span className="text-xs text-gray-400">{item.preco_unidade}</span></td>
                 <td className="px-4 py-3 text-gray-600">{item.data_entrega_prevista ? fmtData(item.data_entrega_prevista) : '-'}</td>
@@ -290,16 +295,16 @@ export default function CompraInsumos() {
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Ano Safra</label>
-                  <SearchableSelect value={form.ano_safra_id} onChange={val => setForm(f => ({ ...f, ano_safra_id: val, safra_id: '' }))}
+                  <SearchableSelect value={form.ano_safra_id} onChange={val => setForm(f => ({ ...f, ano_safra_id: val, safra_ids: [] }))}
                     options={[{ value: '', label: 'Todos' }, ...anosSafra.filter((a: any) => a.ativo).map((a: any) => ({ value: a.id, label: a.nome }))]} placeholder="Ano Safra" />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Safra</label>
-                  <SearchableSelect
-                    value={form.safra_id}
-                    onChange={(val) => setForm(f => ({ ...f, safra_id: val }))}
-                    options={[{ value: '', label: 'Nenhuma' }, ...safras.filter(s => s.ativo && (!form.ano_safra_id || s.ano_safra_id === form.ano_safra_id)).map(s => ({ value: s.id, label: s.nome }))]}
-                    placeholder="Selecione a safra"
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Safras (pode selecionar mais de uma)</label>
+                  <MultiSearchableSelect
+                    values={form.safra_ids}
+                    onChange={(vals) => setForm(f => ({ ...f, safra_ids: vals }))}
+                    options={safras.filter(s => s.ativo && (!form.ano_safra_id || s.ano_safra_id === form.ano_safra_id)).map(s => ({ value: s.id, label: s.nome }))}
+                    placeholder="Selecione as safras..."
                   />
                 </div>
                 <div>

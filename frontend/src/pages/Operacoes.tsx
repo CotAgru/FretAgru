@@ -2,9 +2,10 @@ import { useEffect, useState } from 'react'
 import { fmtData, fmtDataHora } from '../utils/format'
 import { Plus, Pencil, Trash2, X, FolderOpen, FileText, Calendar } from 'lucide-react'
 import toast from 'react-hot-toast'
-import { getOperacoes, createOperacao, updateOperacao, deleteOperacao, getAnosSafra } from '../services/api'
+import { getOperacoes, createOperacao, updateOperacao, deleteOperacao, getAnosSafra, getSafras, syncOperacaoSafras } from '../services/api'
 import ViewModal, { Field, Section } from '../components/ViewModal'
 import SearchableSelect from '../components/SearchableSelect'
+import MultiSearchableSelect from '../components/MultiSearchableSelect'
 
 const STATUS_OPS = [
   { value: 'ativa', label: 'Ativa', color: 'bg-green-100 text-green-700' },
@@ -14,11 +15,13 @@ const STATUS_OPS = [
 
 const emptyForm = {
   nome: '', descricao: '', data_inicio: '', data_fim: '', status: 'ativa', ano_safra_id: '', ativo: true,
+  safra_ids: [] as string[],
 }
 
 export default function Operacoes() {
   const [items, setItems] = useState<any[]>([])
   const [anosSafra, setAnosSafra] = useState<any[]>([])
+  const [safras, setSafras] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [showForm, setShowForm] = useState(false)
   const [editing, setEditing] = useState<any>(null)
@@ -27,8 +30,8 @@ export default function Operacoes() {
 
   const load = () => {
     setLoading(true)
-    Promise.all([getOperacoes(), getAnosSafra()])
-      .then(([ops, as]) => { setItems(ops); setAnosSafra(as) })
+    Promise.all([getOperacoes(), getAnosSafra(), getSafras().catch(() => [])])
+      .then(([ops, as, sf]) => { setItems(ops); setAnosSafra(as); setSafras(sf) })
       .catch(() => toast.error('Erro ao carregar'))
       .finally(() => setLoading(false))
   }
@@ -41,22 +44,26 @@ export default function Operacoes() {
       nome: item.nome || '', descricao: item.descricao || '',
       data_inicio: item.data_inicio || '', data_fim: item.data_fim || '',
       status: item.status || 'ativa', ano_safra_id: item.ano_safra_id || '', ativo: item.ativo,
+      safra_ids: item.safra_ids || [],
     })
     setShowForm(true)
   }
 
   const save = async () => {
     if (!form.nome.trim()) { toast.error('Nome da operação é obrigatório'); return }
+    const { safra_ids, ...rest } = form
     const payload = {
-      ...form,
+      ...rest,
       descricao: form.descricao || null,
       data_inicio: form.data_inicio || null,
       data_fim: form.data_fim || null,
       ano_safra_id: form.ano_safra_id || null,
     }
     try {
-      if (editing) { await updateOperacao(editing.id, payload); toast.success('Operação atualizada') }
-      else { await createOperacao(payload); toast.success('Operação criada') }
+      let result: any
+      if (editing) { result = await updateOperacao(editing.id, payload); toast.success('Operação atualizada') }
+      else { result = await createOperacao(payload); toast.success('Operação criada') }
+      await syncOperacaoSafras(result.id, safra_ids)
       setShowForm(false); load()
     } catch { toast.error('Erro ao salvar') }
   }
@@ -92,7 +99,12 @@ export default function Operacoes() {
                   <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${st.color}`}>{st.label}</span>
                 </div>
                 {item.descricao && <p className="text-sm text-gray-500 mb-2 line-clamp-2">{item.descricao}</p>}
-                {item.ano_safra_nome && <p className="text-xs text-blue-600 font-medium mb-2">Safra: {item.ano_safra_nome}</p>}
+                {(item.ano_safra_nome || item.safras_nomes?.length > 0) && (
+                  <p className="text-xs text-blue-600 font-medium mb-2">
+                    {item.ano_safra_nome && <span>Ano: {item.ano_safra_nome}</span>}
+                    {item.safras_nomes?.length > 0 && <span>{item.ano_safra_nome ? ' | ' : ''}Safras: {item.safras_nomes.join(', ')}</span>}
+                  </p>
+                )}
                 <div className="flex items-center gap-3 text-xs text-gray-400 mb-3">
                   {item.data_inicio && <span>Início: {fmtData(item.data_inicio)}</span>}
                   {item.data_fim && <span>Fim: {fmtData(item.data_fim)}</span>}
@@ -154,10 +166,21 @@ export default function Operacoes() {
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Ano Safra</label>
-                  <SearchableSelect value={form.ano_safra_id} onChange={val => setForm({...form, ano_safra_id: val})}
+                  <SearchableSelect value={form.ano_safra_id} onChange={val => setForm({...form, ano_safra_id: val, safra_ids: []})}
                     options={[{ value: '', label: 'Selecione...' }, ...anosSafra.filter((a: any) => a.ativo).map((a: any) => ({ value: a.id, label: a.nome }))]} placeholder="Ano Safra" />
                 </div>
               </div>
+              {form.ano_safra_id && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Safras (pode selecionar mais de uma)</label>
+                  <MultiSearchableSelect
+                    values={form.safra_ids}
+                    onChange={vals => setForm({...form, safra_ids: vals})}
+                    options={safras.filter(s => s.ativo && s.ano_safra_id === form.ano_safra_id).map(s => ({ value: s.id, label: s.nome }))}
+                    placeholder="Selecione as safras..."
+                  />
+                </div>
+              )}
             </div>
             <div className="flex justify-end gap-2 p-4 border-t">
               <button onClick={() => setShowForm(false)} className="px-4 py-2 text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50">Cancelar</button>
@@ -180,6 +203,7 @@ export default function Operacoes() {
               <Field label="Nome" value={viewingItem.nome} highlight />
               <Field label="Status" value={statusInfo(viewingItem.status).label} highlight />
               <Field label="Ano Safra" value={viewingItem.ano_safra_nome || '-'} />
+              <Field label="Safras" value={viewingItem.safras_nomes?.join(', ') || '-'} />
               <Field label="Criado em" value={fmtDataHora(viewingItem.created_at)} />
             </Section>
 

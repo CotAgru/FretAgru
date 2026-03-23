@@ -162,10 +162,15 @@ export const deleteTipoCaminhao = async (id: string) =>
 export const getOperacoes = async () => {
   const { data, error } = await supabase
     .from('operacoes')
-    .select('*, ano_safra(id, nome)')
+    .select('*, ano_safra(id, nome), operacao_safras(id, safra_id, safras(id, nome))')
     .order('created_at', { ascending: false })
   if (error) throw error
-  return data.map((o: any) => ({ ...o, ano_safra_nome: o.ano_safra?.nome || null }))
+  return data.map((o: any) => ({
+    ...o,
+    ano_safra_nome: o.ano_safra?.nome || null,
+    safra_ids: (o.operacao_safras || []).map((os: any) => os.safra_id),
+    safras_nomes: (o.operacao_safras || []).map((os: any) => os.safras?.nome).filter(Boolean),
+  }))
 }
 
 export const createOperacao = async (data: any) =>
@@ -176,6 +181,49 @@ export const updateOperacao = async (id: string, data: any) =>
 
 export const deleteOperacao = async (id: string) =>
   throwIfError(await supabase.from('operacoes').delete().eq('id', id))
+
+// === JUNCTION: OPERACAO_SAFRAS ===
+export const getOperacaoSafras = async (operacaoId: string) =>
+  throwIfError(await supabase.from('operacao_safras').select('*, safras(id, nome)').eq('operacao_id', operacaoId))
+
+export const syncOperacaoSafras = async (operacaoId: string, safraIds: string[]) => {
+  await supabase.from('operacao_safras').delete().eq('operacao_id', operacaoId)
+  if (safraIds.length > 0) {
+    const rows = safraIds.map(sid => ({ operacao_id: operacaoId, safra_id: sid }))
+    const { error } = await supabase.from('operacao_safras').insert(rows)
+    if (error) throw error
+  }
+}
+
+// === JUNCTION: CONTRATO_VENDA_SAFRAS ===
+export const syncContratoVendaSafras = async (contratoId: string, safraIds: string[]) => {
+  await supabase.from('contrato_venda_safras').delete().eq('contrato_venda_id', contratoId)
+  if (safraIds.length > 0) {
+    const rows = safraIds.map(sid => ({ contrato_venda_id: contratoId, safra_id: sid }))
+    const { error } = await supabase.from('contrato_venda_safras').insert(rows)
+    if (error) throw error
+  }
+}
+
+// === JUNCTION: CONTRATO_COMPRA_SAFRAS ===
+export const syncContratoCompraSafras = async (contratoId: string, safraIds: string[]) => {
+  await supabase.from('contrato_compra_safras').delete().eq('contrato_compra_insumo_id', contratoId)
+  if (safraIds.length > 0) {
+    const rows = safraIds.map(sid => ({ contrato_compra_insumo_id: contratoId, safra_id: sid }))
+    const { error } = await supabase.from('contrato_compra_safras').insert(rows)
+    if (error) throw error
+  }
+}
+
+// === JUNCTION: ROMANEIO_SAFRAS ===
+export const syncRomaneioSafras = async (romaneioId: string, safraIds: string[]) => {
+  await supabase.from('romaneio_safras').delete().eq('romaneio_id', romaneioId)
+  if (safraIds.length > 0) {
+    const rows = safraIds.map(sid => ({ romaneio_id: romaneioId, safra_id: sid }))
+    const { error } = await supabase.from('romaneio_safras').insert(rows)
+    if (error) throw error
+  }
+}
 
 // === ORDENS DE CARREGAMENTO ===
 export const getOrdens = async () => {
@@ -242,13 +290,16 @@ export const getRomaneios = async () => {
       ),
       tipos_nf(id, nome),
       tipos_ticket(id, nome),
-      ano_safra(id, nome)
+      ano_safra(id, nome),
+      romaneio_safras(id, safra_id, safras(id, nome))
     `)
     .order('created_at', { ascending: false })
   if (error) throw error
   return data.map((r: any) => ({
     ...r,
     ordem_nome: r.ordens_carregamento?.nome_ordem || r.ordens_carregamento?.numero_ordem_fmt || null,
+    safra_ids: (r.romaneio_safras || []).map((rs: any) => rs.safra_id),
+    safras_nomes: (r.romaneio_safras || []).map((rs: any) => rs.safras?.nome).filter(Boolean),
   }))
 }
 
@@ -339,8 +390,8 @@ export const getContratosVenda = async () => {
       comprador:cadastros!contratos_venda_comprador_id_fkey(nome, nome_fantasia),
       corretor:cadastros!contratos_venda_corretor_id_fkey(nome, nome_fantasia),
       produtos(nome, tipo),
-      safras(nome),
       ano_safra(nome),
+      contrato_venda_safras(id, safra_id, safras(id, nome)),
       local_entrega:cadastros!contratos_venda_local_entrega_id_fkey(nome, nome_fantasia)
     `)
     .order('created_at', { ascending: false })
@@ -350,8 +401,9 @@ export const getContratosVenda = async () => {
     comprador_nome: c.comprador?.nome_fantasia || c.comprador?.nome,
     corretor_nome: c.corretor?.nome_fantasia || c.corretor?.nome,
     produto_nome: c.produtos?.nome,
-    safra_nome: c.safras?.nome,
     ano_safra_nome: c.ano_safra?.nome,
+    safra_ids: (c.contrato_venda_safras || []).map((s: any) => s.safra_id),
+    safras_nomes: (c.contrato_venda_safras || []).map((s: any) => s.safras?.nome).filter(Boolean),
     local_entrega_nome: c.local_entrega?.nome_fantasia || c.local_entrega?.nome,
   }))
 }
@@ -373,8 +425,8 @@ export const getComprasInsumo = async () => {
       *,
       fornecedor:cadastros!contratos_compra_insumo_fornecedor_id_fkey(nome, nome_fantasia),
       produtos(nome, tipo),
-      safras(nome),
-      ano_safra(nome)
+      ano_safra(nome),
+      contrato_compra_safras(id, safra_id, safras(id, nome))
     `)
     .order('created_at', { ascending: false })
   if (error) throw error
@@ -382,8 +434,9 @@ export const getComprasInsumo = async () => {
     ...c,
     fornecedor_nome: c.fornecedor?.nome_fantasia || c.fornecedor?.nome,
     produto_nome: c.produtos?.nome,
-    safra_nome: c.safras?.nome,
     ano_safra_nome: c.ano_safra?.nome,
+    safra_ids: (c.contrato_compra_safras || []).map((s: any) => s.safra_id),
+    safras_nomes: (c.contrato_compra_safras || []).map((s: any) => s.safras?.nome).filter(Boolean),
   }))
 }
 

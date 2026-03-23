@@ -1,9 +1,10 @@
 import { useEffect, useState, useRef, useMemo } from 'react'
 import { Plus, Pencil, Trash2, X, Camera, Upload, Loader2, FileText, Sparkles, Settings, ZoomIn, Filter, ChevronDown, ExternalLink, Package, Truck, Scale, Target, ArrowUp, ArrowDown, ArrowUpDown } from 'lucide-react'
 import toast from 'react-hot-toast'
-import { getRomaneios, createRomaneio, updateRomaneio, deleteRomaneio, getOrdens, getOperacoes, getCadastros, getVeiculos, getProdutos, getTiposNf, getTiposTicket, getAnosSafra, uploadRomaneioImage, getPrecos } from '../services/api'
+import { getRomaneios, createRomaneio, updateRomaneio, deleteRomaneio, getOrdens, getOperacoes, getCadastros, getVeiculos, getProdutos, getTiposNf, getTiposTicket, getAnosSafra, getSafras, uploadRomaneioImage, getPrecos, syncRomaneioSafras } from '../services/api'
 import ViewModal, { Field, Section } from '../components/ViewModal'
 import SearchableSelect from '../components/SearchableSelect'
+import MultiSearchableSelect from '../components/MultiSearchableSelect'
 import { fmtData, fmtInt, fmtBRL } from '../utils/format'
 import Pagination, { usePagination } from '../components/Pagination'
 import ExportButtons from '../components/ExportButtons'
@@ -49,6 +50,7 @@ const emptyForm = {
   data_saida_origem: '', data_entrada_destino: '', data_saida_destino: '',
   origem_id: '', destinatario_id: '', produtor_id: '', cnpj_cpf: '',
   produto_id: '', veiculo_id: '', placa: '', motorista_id: '', transportadora_id: '', ano_safra_id: '',
+  safra_ids: [] as string[],
   peso_bruto: '', tara: '', peso_liquido: '',
   umidade_perc: '', impureza_perc: '', avariados_perc: '',
   ardidos_perc: '', esverdeados_perc: '', partidos_perc: '',
@@ -70,6 +72,7 @@ export default function Romaneios() {
   const [tiposNf, setTiposNf] = useState<any[]>([])
   const [tiposTicket, setTiposTicket] = useState<any[]>([])
   const [anosSafra, setAnosSafra] = useState<any[]>([])
+  const [safras, setSafras] = useState<any[]>([])
   const [precos, setPrecos] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [showForm, setShowForm] = useState(false)
@@ -141,10 +144,10 @@ export default function Romaneios() {
 
   const load = () => {
     setLoading(true)
-    Promise.all([getRomaneios(), getOrdens(), getOperacoes(), getCadastros(), getVeiculos(), getProdutos(), getTiposNf(), getTiposTicket(), getAnosSafra(), getPrecos()])
-      .then(([r, o, ops, cad, veic, prod, tnf, tt, as_, pr]) => {
+    Promise.all([getRomaneios(), getOrdens(), getOperacoes(), getCadastros(), getVeiculos(), getProdutos(), getTiposNf(), getTiposTicket(), getAnosSafra(), getSafras().catch(() => []), getPrecos()])
+      .then(([r, o, ops, cad, veic, prod, tnf, tt, as_, sf, pr]) => {
         setItems(r); setOrdens(o); setOperacoes(ops); setCadastros(cad)
-        setVeiculos(veic); setProdutos(prod); setTiposNf(tnf); setTiposTicket(tt); setAnosSafra(as_); setPrecos(pr)
+        setVeiculos(veic); setProdutos(prod); setTiposNf(tnf); setTiposTicket(tt); setAnosSafra(as_); setSafras(sf); setPrecos(pr)
       })
       .catch(() => toast.error('Erro ao carregar'))
       .finally(() => setLoading(false))
@@ -241,6 +244,7 @@ export default function Romaneios() {
       placa: item.placa || '',
       motorista_id: item.motorista_id || '', transportadora_id: item.transportadora_id || '',
       ano_safra_id: item.ano_safra_id || '',
+      safra_ids: item.safra_ids || [],
       peso_bruto: fmtKg(item.peso_bruto), tara: fmtKg(item.tara),
       peso_liquido: fmtKg(item.peso_liquido),
       umidade_perc: fmtPerc(item.umidade_perc), impureza_perc: fmtPerc(item.impureza_perc),
@@ -305,11 +309,13 @@ export default function Romaneios() {
     setForm(prev => ({ ...prev, transportadora_id: transpId }))
   }
 
-  // Auto-preencher Operação → Ano Safra
+  // Auto-preencher Operação → Ano Safra + Safras
   const handleOperacaoChange = (opId: string) => {
     const op = operacoes.find((o: any) => o.id === opId)
     const updates: any = { operacao_id: opId, ordem_id: '' }
     if (op?.ano_safra_id) updates.ano_safra_id = op.ano_safra_id
+    if (op?.safra_ids?.length > 0) updates.safra_ids = [...op.safra_ids]
+    else updates.safra_ids = []
     setForm(prev => ({ ...prev, ...updates }))
   }
 
@@ -464,8 +470,11 @@ Use 0 para campos numéricos não encontrados e "" para textos. Pesos em KG inte
 
   const save = async () => {
     if (!form.ordem_id) { toast.error('Selecione uma Ordem de Carregamento'); return }
+    if (form.safra_ids.length === 0 && form.ano_safra_id) { toast.error('É obrigatório selecionar pelo menos uma safra'); return }
+    const safraIdsToSync = [...form.safra_ids]
     const payload: any = {}
     Object.entries(form).forEach(([k, v]) => {
+      if (k === 'safra_ids') return
       if (KG_FIELDS.includes(k)) { payload[k] = parseKg(v as string) }
       else if (PERC_FIELDS.includes(k)) { payload[k] = parsePerc(v as string) }
       else if (v === '' || v === undefined) { payload[k] = null }
@@ -481,8 +490,10 @@ Use 0 para campos numéricos não encontrados e "" para textos. Pesos em KG inte
           toast.error('Erro ao enviar imagem. Salvando sem imagem.')
         }
       }
-      if (editing) { await updateRomaneio(editing.id, payload); toast.success('Romaneio atualizado') }
-      else { await createRomaneio(payload); toast.success('Romaneio cadastrado') }
+      let result: any
+      if (editing) { result = await updateRomaneio(editing.id, payload); toast.success('Romaneio atualizado') }
+      else { result = await createRomaneio(payload); toast.success('Romaneio cadastrado') }
+      await syncRomaneioSafras(result.id, safraIdsToSync)
       setShowForm(false); load()
     } catch (err: any) { toast.error('Erro ao salvar: ' + (err?.message || '')) }
   }
@@ -881,6 +892,23 @@ Use 0 para campos numéricos não encontrados e "" para textos. Pesos em KG inte
                   <label className="block text-sm font-semibold text-orange-700 mb-1">Ordem de Carregamento *</label>
                   <SearchableSelect value={form.ordem_id} onChange={val => handleOrdemChange(val)}
                     options={[{ value: '', label: 'Selecione a Ordem...' }, ...ordensFiltradas.map((o: any) => ({ value: o.id, label: `#${o.numero_ordem_fmt || o.numero_ordem} - ${o.nome_ordem || ''} (${o.origem_nome} → ${o.destino_nome})` }))]} placeholder="Selecione a ordem" />
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-sm font-semibold text-orange-700 mb-1">Ano Safra *</label>
+                    <SearchableSelect value={form.ano_safra_id} onChange={val => setForm(prev => ({ ...prev, ano_safra_id: val, safra_ids: [] }))}
+                      options={[{ value: '', label: 'Selecione...' }, ...anosSafra.filter((a: any) => a.ativo).map((a: any) => ({ value: a.id, label: a.nome }))]} placeholder="Ano Safra" />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-semibold text-orange-700 mb-1">Safras * (mín. 1)</label>
+                    <MultiSearchableSelect
+                      values={form.safra_ids}
+                      onChange={vals => setForm(prev => ({ ...prev, safra_ids: vals }))}
+                      options={safras.filter(s => s.ativo && (!form.ano_safra_id || s.ano_safra_id === form.ano_safra_id)).map(s => ({ value: s.id, label: s.nome }))}
+                      placeholder="Selecione as safras..."
+                      minSelected={1}
+                    />
+                  </div>
                 </div>
               </div>
 

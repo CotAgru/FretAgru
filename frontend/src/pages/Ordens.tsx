@@ -189,6 +189,7 @@ export default function Ordens() {
   }
 
   const save = async () => {
+    if (!form.operacao_id) { toast.error('Operação é obrigatória'); return }
     if (!form.nome_ordem.trim()) { toast.error('Nome da Ordem é obrigatório'); return }
     if (!form.origem_id || !form.destino_id || !form.produto_id) {
       toast.error('Origem, destino e produto são obrigatórios'); return
@@ -618,10 +619,36 @@ export default function Ordens() {
 
               {/* Operacao */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Operacao</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Operação *</label>
                 <SearchableSelect value={form.operacao_id} onChange={val => setForm({...form, operacao_id: val})}
-                  options={[{ value: '', label: 'Nenhuma (avulsa)' }, ...operacoes.map((op: any) => ({ value: op.id, label: op.nome }))]} placeholder="Operação" />
+                  options={[{ value: '', label: 'Selecione a operação...' }, ...operacoes.map((op: any) => ({ value: op.id, label: op.nome }))]} placeholder="Operação" />
               </div>
+
+              {/* Ano Safra + Safras da operação selecionada */}
+              {form.operacao_id && (() => {
+                const op = operacoes.find((o: any) => o.id === form.operacao_id)
+                if (!op) return null
+                return (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    {op.ano_safra_nome && (
+                      <div>
+                        <label className="block text-sm font-medium text-gray-500 mb-1">Ano Safra</label>
+                        <div className="px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-700">{op.ano_safra_nome}</div>
+                      </div>
+                    )}
+                    {op.safras_nomes?.length > 0 && (
+                      <div>
+                        <label className="block text-sm font-medium text-gray-500 mb-1">Safras</label>
+                        <div className="px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-700 flex flex-wrap gap-1">
+                          {op.safras_nomes.map((n: string, i: number) => (
+                            <span key={i} className="inline-flex items-center bg-blue-100 text-blue-800 text-xs font-medium px-2 py-0.5 rounded-full">{n}</span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )
+              })()}
 
               {/* Nome da Ordem */}
               <div>

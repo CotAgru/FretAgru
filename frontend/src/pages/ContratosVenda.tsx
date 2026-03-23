@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react'
 import { ShoppingCart, Plus, Pencil, Trash2, X, Loader2, Search, FileSpreadsheet, Upload, FileText } from 'lucide-react'
 import toast from 'react-hot-toast'
-import { getContratosVenda, createContratoVenda, updateContratoVenda, deleteContratoVenda, getCadastros, getProdutos, getSafras, getAnosSafra, getTiposContrato, getUnidadesMedida } from '../services/api'
+import { getContratosVenda, createContratoVenda, updateContratoVenda, deleteContratoVenda, getCadastros, getProdutos, getSafras, getAnosSafra, getTiposContrato, getUnidadesMedida, syncContratoVendaSafras } from '../services/api'
 import SearchableSelect from '../components/SearchableSelect'
+import MultiSearchableSelect from '../components/MultiSearchableSelect'
 import InfoTooltip from '../components/InfoTooltip'
 import { useSort } from '../hooks/useSort'
 import SortHeader from '../components/SortHeader'
@@ -21,7 +22,8 @@ const MODALIDADES = ['FOB', 'CIF']
 const UNIDADES_PRECO = ['R$/ton', 'R$/sc']
 
 const emptyForm = {
-  numero_contrato: '', comprador_id: '', corretor_id: '', produto_id: '', safra_id: '', ano_safra_id: '',
+  numero_contrato: '', comprador_id: '', corretor_id: '', produto_id: '', ano_safra_id: '',
+  safra_ids: [] as string[],
   tipo_contrato_id: '', quantidade: '', unidade_medida_id: '', valor_unitario: '', valor_total: '',
   modalidade: 'FOB', data_contrato: '', data_entrega_inicio: '', data_entrega_fim: '', status: 'negociacao',
   local_entrega_id: '', observacoes: '', ativo: true, arquivo_url: '',
@@ -80,7 +82,8 @@ export default function ContratosVenda() {
     setForm({
       numero_contrato: item.numero_contrato || '',
       comprador_id: item.comprador_id || '', corretor_id: item.corretor_id || '',
-      produto_id: item.produto_id || '', safra_id: item.safra_id || '', ano_safra_id: item.ano_safra_id || '',
+      produto_id: item.produto_id || '', ano_safra_id: item.ano_safra_id || '',
+      safra_ids: item.safra_ids || [],
       tipo_contrato_id: item.tipo_contrato_id || '',
       quantidade: item.quantidade != null ? String(item.quantidade) : '',
       unidade_medida_id: item.unidade_medida_id || '',
@@ -151,14 +154,14 @@ export default function ContratosVenda() {
       const valorUnitario = parseFloat(form.valor_unitario)
       const valorTotal = quantidade * valorUnitario
       
+      const { safra_ids, ...formRest } = form
       const payload: any = {
-        ...form,
+        ...formRest,
         quantidade,
         valor_unitario: valorUnitario,
         valor_total: valorTotal,
         ano_safra_id: form.ano_safra_id || null,
         corretor_id: form.corretor_id || null,
-        safra_id: form.safra_id || null,
         tipo_contrato_id: form.tipo_contrato_id || null,
         unidade_medida_id: form.unidade_medida_id || null,
         local_entrega_id: form.local_entrega_id || null,
@@ -169,8 +172,10 @@ export default function ContratosVenda() {
         numero_contrato: form.numero_contrato || null,
         arquivo_url: arquivoUrl || null,
       }
-      if (editing) await updateContratoVenda(editing.id, payload)
-      else await createContratoVenda(payload)
+      let result: any
+      if (editing) { result = await updateContratoVenda(editing.id, payload) }
+      else { result = await createContratoVenda(payload) }
+      await syncContratoVendaSafras(result.id, safra_ids)
       toast.success(editing ? 'Contrato atualizado' : 'Contrato cadastrado')
       setShowForm(false); load()
     } catch (err: any) { toast.error('Erro: ' + (err?.message || '')) }
@@ -190,7 +195,7 @@ export default function ContratosVenda() {
       (i.produto_nome || '').toLowerCase().includes(term) ||
       (i.corretor_nome || '').toLowerCase().includes(term) ||
       (i.numero_contrato || '').toLowerCase().includes(term) ||
-      (i.safra_nome || '').toLowerCase().includes(term)
+      (i.safras_nomes || []).join(' ').toLowerCase().includes(term)
   })
 
   const { sortedData: sorted, sortKey, sortDirection, toggleSort } = useSort(filtered)
@@ -207,7 +212,7 @@ export default function ContratosVenda() {
         { key: 'numero_contrato', label: 'Nº Contrato' },
         { key: 'comprador_nome', label: 'Comprador' },
         { key: 'produto_nome', label: 'Produto' },
-        { key: 'safra_nome', label: 'Safra' },
+        { key: 'safras_nomes', label: 'Safras' },
         { key: 'volume_tons', label: 'Volume (ton)' },
         { key: 'preco_valor', label: 'Preço' },
         { key: 'preco_unidade', label: 'Unidade' },
@@ -259,7 +264,7 @@ export default function ContratosVenda() {
               <SortHeader label="Nº" field="numero_contrato" sortKey={sortKey} sortDirection={sortDirection} onSort={toggleSort} />
               <SortHeader label="Comprador" field="comprador_nome" sortKey={sortKey} sortDirection={sortDirection} onSort={toggleSort} />
               <SortHeader label="Produto" field="produto_nome" sortKey={sortKey} sortDirection={sortDirection} onSort={toggleSort} />
-              <SortHeader label="Safra" field="safra_nome" sortKey={sortKey} sortDirection={sortDirection} onSort={toggleSort} />
+              <SortHeader label="Safras" field="safras_nomes" sortKey={sortKey} sortDirection={sortDirection} onSort={toggleSort} />
               <SortHeader label="Volume (ton)" field="volume_tons" sortKey={sortKey} sortDirection={sortDirection} onSort={toggleSort} align="right" />
               <SortHeader label="Preço" field="preco_valor" sortKey={sortKey} sortDirection={sortDirection} onSort={toggleSort} align="right" />
               <th className="px-4 py-3 font-semibold text-gray-600 text-center">Mod.</th>
@@ -273,7 +278,7 @@ export default function ContratosVenda() {
                 <td className="px-4 py-3 text-gray-600">{item.numero_contrato || '-'}</td>
                 <td className="px-4 py-3 font-medium">{item.comprador_nome}</td>
                 <td className="px-4 py-3 text-gray-600">{item.produto_nome}</td>
-                <td className="px-4 py-3 text-gray-600">{item.safra_nome || '-'}</td>
+                <td className="px-4 py-3 text-gray-600">{item.safras_nomes?.length > 0 ? item.safras_nomes.join(', ') : '-'}</td>
                 <td className="px-4 py-3 text-right">{fmtDec(item.volume_tons, 2)}</td>
                 <td className="px-4 py-3 text-right">{fmtBRL(item.preco_valor)} <span className="text-xs text-gray-400">{item.preco_unidade}</span></td>
                 <td className="px-4 py-3 text-center text-xs font-medium">{item.modalidade}</td>
@@ -302,16 +307,16 @@ export default function ContratosVenda() {
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Ano Safra</label>
-                  <SearchableSelect value={form.ano_safra_id} onChange={val => setForm(f => ({ ...f, ano_safra_id: val, safra_id: '' }))}
+                  <SearchableSelect value={form.ano_safra_id} onChange={val => setForm(f => ({ ...f, ano_safra_id: val, safra_ids: [] }))}
                     options={[{ value: '', label: 'Todos' }, ...anosSafra.filter((a: any) => a.ativo).map((a: any) => ({ value: a.id, label: a.nome }))]} placeholder="Ano Safra" />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Safra</label>
-                  <SearchableSelect
-                    value={form.safra_id}
-                    onChange={(val) => setForm(f => ({ ...f, safra_id: val }))}
-                    options={[{ value: '', label: 'Nenhuma' }, ...safras.filter(s => s.ativo && (!form.ano_safra_id || s.ano_safra_id === form.ano_safra_id)).map(s => ({ value: s.id, label: s.nome }))]}
-                    placeholder="Selecione a safra"
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Safras (pode selecionar mais de uma)</label>
+                  <MultiSearchableSelect
+                    values={form.safra_ids}
+                    onChange={(vals) => setForm(f => ({ ...f, safra_ids: vals }))}
+                    options={safras.filter(s => s.ativo && (!form.ano_safra_id || s.ano_safra_id === form.ano_safra_id)).map(s => ({ value: s.id, label: s.nome }))}
+                    placeholder="Selecione as safras..."
                   />
                 </div>
                 <div>
