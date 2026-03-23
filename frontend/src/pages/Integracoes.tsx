@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Link2, Loader2, CheckCircle2, XCircle, RefreshCw, Trash2, Eye, EyeOff, X, ArrowRight, Check, Filter, BarChart3, ArrowUpDown, Upload, Download, Link as LinkIcon, Search, Building2 } from 'lucide-react'
+import { Link2, Loader2, CheckCircle2, XCircle, RefreshCw, Trash2, Eye, EyeOff, X, ArrowRight, Check, Filter, BarChart3, ArrowUpDown, Upload, Download, Link as LinkIcon, Search, Building2, AlertCircle } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { getIntegracaoByProvedor, upsertIntegracao, deleteIntegracao, getCulturas, createCultura, getTiposSafra, createTipoSafra, getAnosSafra, createAnoSafra, upsertSafraFromAegro, getImportedAegroSafras, getCadastros, getImportedAegroCadastros, upsertCadastroAegroKey, createCadastroFromAegro } from '../services/api'
 import { aegroTestConnection, aegroGetCrops, aegroGetCompanies, aegroCreateCompany } from '../services/aegro'
@@ -97,6 +97,8 @@ export default function Integracoes() {
   // Preview antes de enviar ao Aegro
   const [showPreviewModal, setShowPreviewModal] = useState(false)
   const [previewData, setPreviewData] = useState<{ idx: number; sync: CompanySync; payload: any } | null>(null)
+  const [errorLog, setErrorLog] = useState<{ message: string; response: any; timestamp: string; payload?: any; cadastro?: any } | null>(null)
+  const [showErrorLogModal, setShowErrorLogModal] = useState(false)
 
   // Stats de sincronização (dashboard)
   const [syncStats, setSyncStats] = useState<{
@@ -752,14 +754,26 @@ export default function Integracoes() {
           ...item, aegroKey: newKey, aegroName: s.iagruNome, status: 'linked', processing: false, done: true, matchField: 'enviado',
         } : item))
         toast.success(`Enviado ao Aegro: ${s.iagruNome} → key: ${newKey}`)
+        setErrorLog(null) // Limpar log de erro em caso de sucesso
       } else {
         throw new Error('Aegro não retornou company key')
       }
     } catch (err: any) {
       const errorMsg = err?.message || 'Erro desconhecido'
-      console.error('Erro ao enviar para Aegro:', err)
+      console.error('=== ERRO AEGRO COMPLETO ===', err)
+      
+      // Capturar erro detalhado
+      const errorDetail = {
+        message: errorMsg,
+        response: err?.response || err,
+        timestamp: new Date().toISOString(),
+        payload: JSON.parse(JSON.stringify(payload)), // clone
+        cadastro: { id: s.iagruId, nome: s.iagruNome, cpf_cnpj: s.iagruCpfCnpj, tipos: s.iagruTipos }
+      }
+      setErrorLog(errorDetail)
+      
       setCompanySyncs(prev => prev.map((item, i) => i === idx ? { ...item, processing: false, error: errorMsg } : item))
-      toast.error(`Erro ao enviar: ${errorMsg}`)
+      toast.error(`Erro ao enviar - Clique em "Ver Log Completo"`)
     } finally {
       setPreviewData(null)
     }
@@ -1177,7 +1191,17 @@ export default function Integracoes() {
                 <h2 className="text-lg font-bold text-gray-800 flex items-center gap-2"><Building2 className="w-5 h-5 text-green-600" /> Sync Cadastros — iAgru ↔ Aegro</h2>
                 <p className="text-sm text-gray-500 mt-0.5">Vincule, envie ou importe cadastros entre os dois sistemas</p>
               </div>
-              <button onClick={() => setShowSyncCadModal(false)} className="p-2 hover:bg-gray-100 rounded-lg"><X className="w-5 h-5 text-gray-500" /></button>
+              <div className="flex items-center gap-2">
+                {errorLog && (
+                  <button onClick={() => setShowErrorLogModal(true)}
+                    className="px-3 py-1.5 bg-red-50 text-red-700 border border-red-200 rounded-lg text-xs font-medium hover:bg-red-100 flex items-center gap-1.5">
+                    <AlertCircle className="w-4 h-4" /> Ver Log Completo de Erro
+                  </button>
+                )}
+                <button onClick={() => setShowSyncCadModal(false)} className="p-2 hover:bg-gray-100 rounded-lg">
+                  <X className="w-5 h-5 text-gray-600" />
+                </button>
+              </div>
             </div>
 
             {loadingSyncCad ? (
@@ -1323,6 +1347,86 @@ export default function Integracoes() {
                 </div>
               </>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* ========== MODAL LOG DE ERRO DETALHADO ========== */}
+      {showErrorLogModal && errorLog && (
+        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/60 overflow-y-auto py-4 px-2">
+          <div className="bg-white rounded-xl shadow-2xl w-full max-w-4xl my-2">
+            {/* Header */}
+            <div className="flex items-center justify-between p-4 border-b bg-red-50">
+              <div>
+                <h2 className="text-lg font-bold text-red-800 flex items-center gap-2">
+                  <AlertCircle className="w-5 h-5" /> Log Completo de Erro — Aegro API
+                </h2>
+                <p className="text-sm text-red-600 mt-0.5">Detalhes técnicos do erro retornado pela API</p>
+              </div>
+              <button onClick={() => setShowErrorLogModal(false)} className="p-2 hover:bg-red-100 rounded-lg">
+                <X className="w-5 h-5 text-red-700" />
+              </button>
+            </div>
+
+            {/* Corpo */}
+            <div className="p-4 space-y-4 max-h-[70vh] overflow-y-auto">
+              {/* Timestamp */}
+              <div>
+                <p className="text-xs font-semibold text-gray-600 uppercase mb-1">Timestamp</p>
+                <p className="text-sm text-gray-800 font-mono">{new Date(errorLog.timestamp).toLocaleString('pt-BR')}</p>
+              </div>
+
+              {/* Mensagem de Erro */}
+              <div>
+                <p className="text-xs font-semibold text-gray-600 uppercase mb-1">Mensagem de Erro</p>
+                <div className="bg-red-50 border border-red-200 rounded-lg p-3">
+                  <p className="text-sm text-red-700 font-medium">{errorLog.message}</p>
+                </div>
+              </div>
+
+              {/* Cadastro Tentado */}
+              {errorLog.cadastro && (
+                <div>
+                  <p className="text-xs font-semibold text-gray-600 uppercase mb-1">Cadastro que Tentou Enviar</p>
+                  <pre className="bg-gray-100 border border-gray-300 rounded-lg p-3 text-xs overflow-x-auto font-mono">
+{JSON.stringify(errorLog.cadastro, null, 2)}
+                  </pre>
+                </div>
+              )}
+
+              {/* Payload Enviado */}
+              {errorLog.payload && (
+                <div>
+                  <p className="text-xs font-semibold text-gray-600 uppercase mb-1">Payload Enviado (POST /pub/v1/companies)</p>
+                  <pre className="bg-gray-900 text-green-400 rounded-lg p-3 text-xs overflow-x-auto font-mono">
+{JSON.stringify(errorLog.payload, null, 2)}
+                  </pre>
+                </div>
+              )}
+
+              {/* Resposta Completa do Aegro */}
+              <div>
+                <p className="text-xs font-semibold text-gray-600 uppercase mb-1">Resposta Completa do Aegro API</p>
+                <pre className="bg-gray-900 text-red-400 rounded-lg p-3 text-xs overflow-x-auto font-mono max-h-60">
+{JSON.stringify(errorLog.response, null, 2)}
+                </pre>
+              </div>
+
+              {/* Dica */}
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                <p className="text-xs text-blue-800">
+                  <strong>Dica:</strong> Procure por "errors" ou "message" na resposta do Aegro para identificar campos obrigatórios faltantes ou valores inválidos.
+                </p>
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div className="flex items-center justify-end gap-2 p-4 border-t bg-gray-50">
+              <button onClick={() => setShowErrorLogModal(false)}
+                className="px-4 py-2 bg-gray-600 text-white rounded-lg text-sm font-medium hover:bg-gray-700">
+                Fechar
+              </button>
+            </div>
           </div>
         </div>
       )}
