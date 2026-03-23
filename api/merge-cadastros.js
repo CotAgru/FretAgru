@@ -36,62 +36,55 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: 'keepId e removeId não podem ser iguais' })
     }
 
-    // 1. Transferir vínculos de ordens_carregamento
-    const { error: errorOrdens } = await supabase
-      .from('ordens_carregamento')
-      .update({ fornecedor_id: keepId })
-      .eq('fornecedor_id', removeId)
-
-    if (errorOrdens && errorOrdens.code !== 'PGRST116') { // PGRST116 = sem registros encontrados (OK)
-      console.error('Erro ao transferir ordens:', errorOrdens)
-      throw new Error('Erro ao transferir ordens de carregamento')
+    // Helper: transferir FK de uma tabela, ignorando erros se tabela/coluna não existir
+    const transferFK = async (tabela, coluna) => {
+      try {
+        const { error } = await supabase.from(tabela).update({ [coluna]: keepId }).eq(coluna, removeId)
+        if (error && error.code !== 'PGRST116' && error.code !== '42P01' && error.code !== '42703') {
+          console.error(`Erro ao transferir ${tabela}.${coluna}:`, error)
+        }
+      } catch (e) {
+        console.error(`Exceção ao transferir ${tabela}.${coluna}:`, e)
+      }
     }
 
-    // 2. Transferir vínculos de romaneios (se existir)
-    const { error: errorRomaneios } = await supabase
-      .from('romaneios')
-      .update({ fornecedor_id: keepId })
-      .eq('fornecedor_id', removeId)
+    // 1. Ordens de carregamento
+    await transferFK('ordens_carregamento', 'origem_id')
+    await transferFK('ordens_carregamento', 'destino_id')
+    await transferFK('ordens_carregamento', 'transportador_id')
+    await transferFK('ordens_carregamento', 'motorista_id')
 
-    if (errorRomaneios && errorRomaneios.code !== 'PGRST116') {
-      console.error('Erro ao transferir romaneios:', errorRomaneios)
-      // Não vamos bloquear se a tabela não existir
-    }
+    // 2. Ordem transportadores
+    await transferFK('ordem_transportadores', 'transportador_id')
+    await transferFK('ordem_transportadores', 'motorista_id')
 
-    // 3. Transferir vínculos de precos_contratados (se existir)
-    const { error: errorPrecos } = await supabase
-      .from('precos_contratados')
-      .update({ cadastro_id: keepId })
-      .eq('cadastro_id', removeId)
+    // 3. Romaneios (todos os campos que referenciam cadastros)
+    await transferFK('romaneios', 'origem_id')
+    await transferFK('romaneios', 'destinatario_id')
+    await transferFK('romaneios', 'produtor_id')
+    await transferFK('romaneios', 'motorista_id')
+    await transferFK('romaneios', 'transportadora_id')
 
-    if (errorPrecos && errorPrecos.code !== 'PGRST116') {
-      console.error('Erro ao transferir preços:', errorPrecos)
-      // Não vamos bloquear se a tabela não existir
-    }
+    // 4. Preços contratados
+    await transferFK('precos_contratados', 'origem_id')
+    await transferFK('precos_contratados', 'destino_id')
+    await transferFK('precos_contratados', 'fornecedor_id')
 
-    // 4. Transferir veículos vinculados (se for motorista)
-    const { error: errorVeiculos } = await supabase
-      .from('veiculos')
-      .update({ cadastro_id: keepId })
-      .eq('cadastro_id', removeId)
+    // 5. Veículos
+    await transferFK('veiculos', 'cadastro_id')
 
-    if (errorVeiculos && errorVeiculos.code !== 'PGRST116') {
-      console.error('Erro ao transferir veículos:', errorVeiculos)
-      throw new Error('Erro ao transferir veículos')
-    }
+    // 6. Cadastros (motoristas vinculados à transportadora)
+    await transferFK('cadastros', 'transportador_id')
 
-    // 5. Transferir motoristas vinculados à transportadora (se for transportadora)
-    const { error: errorMotoristas } = await supabase
-      .from('cadastros')
-      .update({ transportador_id: keepId })
-      .eq('transportador_id', removeId)
+    // 7. Contratos de venda
+    await transferFK('contratos_venda', 'comprador_id')
+    await transferFK('contratos_venda', 'corretor_id')
+    await transferFK('contratos_venda', 'local_entrega_id')
 
-    if (errorMotoristas && errorMotoristas.code !== 'PGRST116') {
-      console.error('Erro ao transferir motoristas:', errorMotoristas)
-      throw new Error('Erro ao transferir motoristas vinculados')
-    }
+    // 8. Contratos de compra de insumo
+    await transferFK('contratos_compra_insumo', 'fornecedor_id')
 
-    // 6. Desativar o cadastro removido
+    // 9. Desativar o cadastro removido
     const obsAntigas = await getObservacoes(removeId)
     const { error: errorDesativar } = await supabase
       .from('cadastros')

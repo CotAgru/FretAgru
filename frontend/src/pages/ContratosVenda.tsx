@@ -66,6 +66,9 @@ export default function ContratosVenda() {
   }
   useEffect(() => { load() }, [])
 
+  // Extrair anos únicos das safras cadastradas
+  const anosSafra = [...new Set(safras.filter(s => s.ano).map(s => s.ano))].sort((a, b) => b - a)
+
   const compradores = cadastros.filter(c => (c.tipos || []).some((t: string) => ['Comprador', 'Industria', 'Armazem', 'Porto'].includes(t)))
   const corretores = cadastros.filter(c => (c.tipos || []).includes('Corretor'))
   const locaisEntrega = cadastros.filter(c => (c.tipos || []).some((t: string) => ['Armazem', 'Industria', 'Porto', 'Fazenda'].includes(t)))
@@ -288,7 +291,7 @@ export default function ContratosVenda() {
       {/* Modal */}
       {showForm && (
         <div className="fixed inset-0 bg-black/50 flex items-start justify-center z-50 p-4 overflow-y-auto">
-          <div className="bg-white rounded-xl shadow-xl w-full max-w-2xl my-8">
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-4xl my-8">
             <div className="flex items-center justify-between p-4 border-b">
               <h2 className="text-lg font-semibold">{editing ? 'Editar' : 'Novo'} Contrato de Venda</h2>
               <button onClick={() => setShowForm(false)} className="p-1 hover:bg-gray-100 rounded"><X className="w-5 h-5" /></button>
@@ -298,8 +301,11 @@ export default function ContratosVenda() {
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Ano Safra</label>
-                  <input type="number" value={form.ano_safra} onChange={e => setForm(f => ({ ...f, ano_safra: e.target.value }))}
-                    placeholder="2024" className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
+                  <select value={form.ano_safra} onChange={e => setForm(f => ({ ...f, ano_safra: e.target.value, safra_id: '' }))}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                    <option value="">Todos</option>
+                    {anosSafra.map(ano => <option key={ano} value={String(ano)}>{ano}</option>)}
+                  </select>
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Safra</label>

@@ -177,10 +177,83 @@ export default function Integracoes() {
     })
   }, [])
 
+  // Carregar counts de cadastros (sem abrir modal)
+  const loadCadastroStats = async (tkn: string) => {
+    try {
+      const [cadastrosData, companiesData] = await Promise.all([
+        getCadastros(),
+        aegroGetCompanies(tkn, 1, 500),
+      ])
+      const cadastros: any[] = cadastrosData || []
+      const companies: any[] = companiesData?.items || (Array.isArray(companiesData) ? companiesData : [])
+      const normalizedCompanies = companies.map(co => ({
+        ...co,
+        cpfCnpj: co.fiscalNumber?.code || co.cpfCnpj || null
+      }))
+
+      const cadByCnpj = new Map<string, any>()
+      const cadByName = new Map<string, any>()
+      for (const c of cadastros) {
+        const cnpj = normCnpj(c.cpf_cnpj)
+        if (cnpj.length >= 11) cadByCnpj.set(cnpj, c)
+        cadByName.set(normName(c.nome), c)
+        if (c.nome_fantasia) cadByName.set(normName(c.nome_fantasia), c)
+      }
+
+      const usedCadIds = new Set<string>()
+      const usedAegroKeys = new Set<string>()
+      const syncs: CompanySync[] = []
+
+      for (const cad of cadastros) {
+        if (cad.aegro_company_key) {
+          const aegroMatch = normalizedCompanies.find((co: any) => co.key === cad.aegro_company_key)
+          if (!aegroMatch) {
+            syncs.push({ aegroKey: cad.aegro_company_key, aegroName: null, aegroTradeName: null, aegroCpfCnpj: null, aegroPhone: null, aegroState: null, aegroCity: null, aegroRaw: null, iagruId: cad.id, iagruNome: cad.nome, iagruNomeFantasia: cad.nome_fantasia, iagruCpfCnpj: cad.cpf_cnpj, iagruTelefone: cad.telefone1, iagruUf: cad.uf, iagruCidade: cad.cidade, iagruCodigoIbge: cad.codigo_ibge, iagruTipos: cad.tipos || [], status: 'only_iagru', matchField: null, processing: false, done: false, error: `⚠️ Removido do Aegro` })
+            usedCadIds.add(cad.id)
+          } else {
+            syncs.push({ aegroKey: cad.aegro_company_key, aegroName: aegroMatch.name || null, aegroTradeName: aegroMatch.tradeName || null, aegroCpfCnpj: aegroMatch.cpfCnpj || null, aegroPhone: aegroMatch.phone || null, aegroState: aegroMatch.state || null, aegroCity: aegroMatch.city || null, aegroRaw: aegroMatch || null, iagruId: cad.id, iagruNome: cad.nome, iagruNomeFantasia: cad.nome_fantasia, iagruCpfCnpj: cad.cpf_cnpj, iagruTelefone: cad.telefone1, iagruUf: cad.uf, iagruCidade: cad.cidade, iagruCodigoIbge: cad.codigo_ibge, iagruTipos: cad.tipos || [], status: 'linked', matchField: 'aegro_company_key', processing: false, done: false, error: null })
+            usedCadIds.add(cad.id)
+            usedAegroKeys.add(aegroMatch.key)
+          }
+        }
+      }
+
+      for (const co of normalizedCompanies) {
+        if (usedAegroKeys.has(co.key)) continue
+        const cnpj = normCnpj(co.cpfCnpj)
+        let matchedCad: any = null
+        let matchField = ''
+        if (cnpj.length >= 11 && cadByCnpj.has(cnpj)) { matchedCad = cadByCnpj.get(cnpj); matchField = 'cpf_cnpj' }
+        if (!matchedCad) {
+          const nameMatch = cadByName.get(normName(co.name)) || cadByName.get(normName(co.tradeName))
+          if (nameMatch && !usedCadIds.has(nameMatch.id)) { matchedCad = nameMatch; matchField = 'nome' }
+        }
+        if (matchedCad && !usedCadIds.has(matchedCad.id)) {
+          syncs.push({ aegroKey: co.key, aegroName: co.name, aegroTradeName: co.tradeName || null, aegroCpfCnpj: co.cpfCnpj || null, aegroPhone: co.phone || null, aegroState: co.state || null, aegroCity: co.city || null, aegroRaw: co || null, iagruId: matchedCad.id, iagruNome: matchedCad.nome, iagruNomeFantasia: matchedCad.nome_fantasia, iagruCpfCnpj: matchedCad.cpf_cnpj, iagruTelefone: matchedCad.telefone1, iagruUf: matchedCad.uf, iagruCidade: matchedCad.cidade, iagruCodigoIbge: matchedCad.codigo_ibge, iagruTipos: matchedCad.tipos || [], status: 'match_suggestion', matchField, processing: false, done: false, error: null })
+          usedCadIds.add(matchedCad.id)
+          usedAegroKeys.add(co.key)
+        } else {
+          syncs.push({ aegroKey: co.key, aegroName: co.name, aegroTradeName: co.tradeName || null, aegroCpfCnpj: co.cpfCnpj || null, aegroPhone: co.phone || null, aegroState: co.state || null, aegroCity: co.city || null, aegroRaw: co || null, iagruId: null, iagruNome: null, iagruNomeFantasia: null, iagruCpfCnpj: null, iagruTelefone: null, iagruUf: null, iagruCidade: null, iagruCodigoIbge: null, iagruTipos: [], status: 'only_aegro', matchField: null, processing: false, done: false, error: null })
+          usedAegroKeys.add(co.key)
+        }
+      }
+
+      for (const cad of cadastros) {
+        if (usedCadIds.has(cad.id)) continue
+        syncs.push({ aegroKey: null, aegroName: null, aegroTradeName: null, aegroCpfCnpj: null, aegroPhone: null, aegroState: null, aegroCity: null, aegroRaw: null, iagruId: cad.id, iagruNome: cad.nome, iagruNomeFantasia: cad.nome_fantasia, iagruCpfCnpj: cad.cpf_cnpj, iagruTelefone: cad.telefone1, iagruUf: cad.uf, iagruCidade: cad.cidade, iagruCodigoIbge: cad.codigo_ibge, iagruTipos: cad.tipos || [], status: 'only_iagru', matchField: null, processing: false, done: false, error: null })
+      }
+
+      setCompanySyncs(syncs)
+    } catch (err) {
+      console.error('Erro ao carregar stats de cadastros:', err)
+    }
+  }
+
   // Carregar stats quando conectado e token disponível
   useEffect(() => {
     if (aegro?.status === 'conectado' && token.trim()) {
       loadSyncStats(token)
+      loadCadastroStats(token)
     }
   }, [aegro?.status])
 
@@ -768,11 +841,13 @@ export default function Integracoes() {
       types: ['PROVIDER'], // Fornecedor por padrão (fixo no Aegro)
     }
     
-    // Tipos iAgru → observations (formato: #TipoCadastro - Motorista;Fornecedor;)
+    // Observations: incluir #iAgru_chave_id e #TipoCadastro
+    let obs = `#iAgru_chave_id - ${s.iagruId};`
     if (s.iagruTipos && s.iagruTipos.length > 0) {
       const tiposStr = s.iagruTipos.join(';')
-      payload.observations = `#TipoCadastro - ${tiposStr};`
+      obs += ` #TipoCadastro - ${tiposStr};`
     }
+    payload.observations = obs
     
     // fiscalNumber (CPF/CNPJ) - objeto
     if (s.iagruCpfCnpj?.trim()) {

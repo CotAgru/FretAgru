@@ -65,6 +65,9 @@ export default function CompraInsumos() {
   }
   useEffect(() => { load() }, [])
 
+  // Extrair anos únicos das safras cadastradas
+  const anosSafra = [...new Set(safras.filter(s => s.ano).map(s => s.ano))].sort((a: number, b: number) => b - a)
+
   const fornecedores = cadastros.filter(c => (c.tipos || []).some((t: string) => ['Fornecedor', 'Industria'].includes(t)))
 
   const openNew = () => { setEditing(null); setForm(emptyForm); setSelectedFile(null); setShowForm(true) }
@@ -276,7 +279,7 @@ export default function CompraInsumos() {
       {/* Modal */}
       {showForm && (
         <div className="fixed inset-0 bg-black/50 flex items-start justify-center z-50 p-4 overflow-y-auto">
-          <div className="bg-white rounded-xl shadow-xl w-full max-w-lg my-8">
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-4xl my-8">
             <div className="flex items-center justify-between p-4 border-b">
               <h2 className="text-lg font-semibold">{editing ? 'Editar' : 'Nova'} Compra de Insumo</h2>
               <button onClick={() => setShowForm(false)} className="p-1 hover:bg-gray-100 rounded"><X className="w-5 h-5" /></button>
@@ -286,8 +289,11 @@ export default function CompraInsumos() {
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Ano Safra</label>
-                  <input type="number" value={form.ano_safra} onChange={e => setForm(f => ({ ...f, ano_safra: e.target.value }))}
-                    placeholder="2024" className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent" />
+                  <select value={form.ano_safra} onChange={e => setForm(f => ({ ...f, ano_safra: e.target.value, safra_id: '' }))}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent">
+                    <option value="">Todos</option>
+                    {anosSafra.map((ano: number) => <option key={ano} value={String(ano)}>{ano}</option>)}
+                  </select>
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Safra</label>
