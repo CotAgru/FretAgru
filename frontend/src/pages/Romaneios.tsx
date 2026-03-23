@@ -3,6 +3,7 @@ import { Plus, Pencil, Trash2, X, Camera, Upload, Loader2, FileText, Sparkles, S
 import toast from 'react-hot-toast'
 import { getRomaneios, createRomaneio, updateRomaneio, deleteRomaneio, getOrdens, getOperacoes, getCadastros, getVeiculos, getProdutos, getTiposNf, getTiposTicket, getAnosSafra, uploadRomaneioImage, getPrecos } from '../services/api'
 import ViewModal, { Field, Section } from '../components/ViewModal'
+import SearchableSelect from '../components/SearchableSelect'
 import { fmtData, fmtInt, fmtBRL } from '../utils/format'
 import Pagination, { usePagination } from '../components/Pagination'
 import ExportButtons from '../components/ExportButtons'
@@ -873,23 +874,13 @@ Use 0 para campos numéricos não encontrados e "" para textos. Pesos em KG inte
               <div className="border-2 border-orange-200 bg-orange-50 rounded-lg p-3 space-y-3">
                 <div>
                   <label className="block text-sm font-semibold text-orange-700 mb-1">Operação</label>
-                  <select value={form.operacao_id} onChange={e => handleOperacaoChange(e.target.value)}
-                    className="w-full px-3 py-2 border border-orange-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent bg-white">
-                    <option value="">Todas as operações</option>
-                    {operacoes.map((op: any) => <option key={op.id} value={op.id}>{op.nome}</option>)}
-                  </select>
+                  <SearchableSelect value={form.operacao_id} onChange={val => handleOperacaoChange(val)}
+                    options={[{ value: '', label: 'Todas as operações' }, ...operacoes.map((op: any) => ({ value: op.id, label: op.nome }))]} placeholder="Selecione a operação" />
                 </div>
                 <div>
                   <label className="block text-sm font-semibold text-orange-700 mb-1">Ordem de Carregamento *</label>
-                  <select value={form.ordem_id} onChange={e => handleOrdemChange(e.target.value)}
-                    className="w-full px-3 py-2 border border-orange-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent bg-white">
-                    <option value="">Selecione a Ordem...</option>
-                    {ordensFiltradas.map((o: any) => (
-                      <option key={o.id} value={o.id}>
-                        #{o.numero_ordem_fmt || o.numero_ordem} - {o.nome_ordem || ''} ({o.origem_nome} → {o.destino_nome})
-                      </option>
-                    ))}
-                  </select>
+                  <SearchableSelect value={form.ordem_id} onChange={val => handleOrdemChange(val)}
+                    options={[{ value: '', label: 'Selecione a Ordem...' }, ...ordensFiltradas.map((o: any) => ({ value: o.id, label: `#${o.numero_ordem_fmt || o.numero_ordem} - ${o.nome_ordem || ''} (${o.origem_nome} → ${o.destino_nome})` }))]} placeholder="Selecione a ordem" />
                 </div>
               </div>
 
@@ -961,11 +952,8 @@ Use 0 para campos numéricos não encontrados e "" para textos. Pesos em KG inte
                 </div>
                 <div>
                   <label className="block text-xs font-medium text-gray-700 mb-1">Tipo Ticket</label>
-                  <select value={form.tipo_ticket_id} onChange={e => setForm({...form, tipo_ticket_id: e.target.value})}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm">
-                    <option value="">Selecione...</option>
-                    {tiposTicket.filter((t: any) => t.ativo).map((t: any) => <option key={t.id} value={t.id}>{t.nome}</option>)}
-                  </select>
+                  <SearchableSelect value={form.tipo_ticket_id} onChange={val => setForm({...form, tipo_ticket_id: val})}
+                    options={[{ value: '', label: 'Selecione...' }, ...tiposTicket.filter((t: any) => t.ativo).map((t: any) => ({ value: t.id, label: t.nome }))]} placeholder="Tipo Ticket" />
                 </div>
                 <div>
                   <label className="block text-xs font-medium text-gray-700 mb-1">NF-e</label>
@@ -974,22 +962,16 @@ Use 0 para campos numéricos não encontrados e "" para textos. Pesos em KG inte
                 </div>
                 <div>
                   <label className="block text-xs font-medium text-gray-700 mb-1">Tipo NF</label>
-                  <select value={form.tipo_nf_id} onChange={e => setForm({...form, tipo_nf_id: e.target.value})}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm">
-                    <option value="">Selecione...</option>
-                    {tiposNf.filter((t: any) => t.ativo).map((t: any) => <option key={t.id} value={t.id}>{t.nome}</option>)}
-                  </select>
+                  <SearchableSelect value={form.tipo_nf_id} onChange={val => setForm({...form, tipo_nf_id: val})}
+                    options={[{ value: '', label: 'Selecione...' }, ...tiposNf.filter((t: any) => t.ativo).map((t: any) => ({ value: t.id, label: t.nome }))]} placeholder="Tipo NF" />
                 </div>
               </div>
 
               <div className="grid grid-cols-3 gap-3">
                 <div>
                   <label className="block text-xs font-medium text-gray-700 mb-1">Ano Safra</label>
-                  <select value={form.ano_safra_id} onChange={e => setForm({...form, ano_safra_id: e.target.value})}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm bg-gray-50">
-                    <option value="">Selecione...</option>
-                    {anosSafra.filter((a: any) => a.ativo).map((a: any) => <option key={a.id} value={a.id}>{a.nome}</option>)}
-                  </select>
+                  <SearchableSelect value={form.ano_safra_id} onChange={val => setForm({...form, ano_safra_id: val})}
+                    options={[{ value: '', label: 'Selecione...' }, ...anosSafra.filter((a: any) => a.ativo).map((a: any) => ({ value: a.id, label: a.nome }))]} placeholder="Ano Safra" />
                 </div>
                 <div>
                   <label className="block text-xs font-medium text-gray-700 mb-1">Transgenia</label>
@@ -1006,27 +988,18 @@ Use 0 para campos numéricos não encontrados e "" para textos. Pesos em KG inte
               <div className="grid grid-cols-3 gap-3">
                 <div>
                   <label className="block text-xs font-medium text-gray-700 mb-1">Origem</label>
-                  <select value={form.origem_id} onChange={e => setForm({...form, origem_id: e.target.value})}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm bg-green-50">
-                    <option value="">Selecione...</option>
-                    {origensList.map((c: any) => <option key={c.id} value={c.id}>{c.nome_fantasia || c.nome}</option>)}
-                  </select>
+                  <SearchableSelect value={form.origem_id} onChange={val => setForm({...form, origem_id: val})}
+                    options={[{ value: '', label: 'Selecione...' }, ...origensList.map((c: any) => ({ value: c.id, label: c.nome_fantasia || c.nome }))]} placeholder="Origem" />
                 </div>
                 <div>
                   <label className="block text-xs font-medium text-gray-700 mb-1">Destinatário</label>
-                  <select value={form.destinatario_id} onChange={e => setForm({...form, destinatario_id: e.target.value})}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm bg-green-50">
-                    <option value="">Selecione...</option>
-                    {origensList.map((c: any) => <option key={c.id} value={c.id}>{c.nome_fantasia || c.nome}</option>)}
-                  </select>
+                  <SearchableSelect value={form.destinatario_id} onChange={val => setForm({...form, destinatario_id: val})}
+                    options={[{ value: '', label: 'Selecione...' }, ...origensList.map((c: any) => ({ value: c.id, label: c.nome_fantasia || c.nome }))]} placeholder="Destinatário" />
                 </div>
                 <div>
                   <label className="block text-xs font-medium text-gray-700 mb-1">Produto</label>
-                  <select value={form.produto_id} onChange={e => setForm({...form, produto_id: e.target.value})}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm bg-green-50">
-                    <option value="">Selecione...</option>
-                    {produtos.map((p: any) => <option key={p.id} value={p.id}>{p.nome}</option>)}
-                  </select>
+                  <SearchableSelect value={form.produto_id} onChange={val => setForm({...form, produto_id: val})}
+                    options={[{ value: '', label: 'Selecione...' }, ...produtos.map((p: any) => ({ value: p.id, label: p.nome }))]} placeholder="Produto" />
                 </div>
               </div>
 
@@ -1034,14 +1007,11 @@ Use 0 para campos numéricos não encontrados e "" para textos. Pesos em KG inte
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-medium text-gray-700 mb-1">Produtor</label>
-                  <select value={form.produtor_id} onChange={e => {
-                    const prod = cadastros.find((c: any) => c.id === e.target.value)
-                    setForm({...form, produtor_id: e.target.value, cnpj_cpf: prod?.cpf_cnpj || form.cnpj_cpf})
+                  <SearchableSelect value={form.produtor_id} onChange={val => {
+                    const prod = cadastros.find((c: any) => c.id === val)
+                    setForm({...form, produtor_id: val, cnpj_cpf: prod?.cpf_cnpj || form.cnpj_cpf})
                   }}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm">
-                    <option value="">Selecione...</option>
-                    {produtoresList.map((c: any) => <option key={c.id} value={c.id}>{c.nome_fantasia || c.nome}</option>)}
-                  </select>
+                    options={[{ value: '', label: 'Selecione...' }, ...produtoresList.map((c: any) => ({ value: c.id, label: c.nome_fantasia || c.nome }))]} placeholder="Produtor" />
                 </div>
                 <div>
                   <label className="block text-xs font-medium text-gray-700 mb-1">CNPJ/CPF</label>
@@ -1054,11 +1024,8 @@ Use 0 para campos numéricos não encontrados e "" para textos. Pesos em KG inte
               <div className="grid grid-cols-3 gap-3">
                 <div>
                   <label className="block text-xs font-medium text-gray-700 mb-1">Placa</label>
-                  <select value={form.veiculo_id} onChange={e => handleVeiculoChange(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm font-mono">
-                    <option value="">Selecione...</option>
-                    {veiculosFiltrados.map((v: any) => <option key={v.id} value={v.id}>{v.placa} ({v.tipo_caminhao})</option>)}
-                  </select>
+                  <SearchableSelect value={form.veiculo_id} onChange={val => handleVeiculoChange(val)}
+                    options={[{ value: '', label: 'Selecione...' }, ...veiculosFiltrados.map((v: any) => ({ value: v.id, label: `${v.placa} (${v.tipo_caminhao})` }))]} placeholder="Placa" />
                   {!form.veiculo_id && form.placa && (
                     <div className="mt-1 flex items-center gap-2 px-2 py-1 bg-amber-50 border border-amber-200 rounded text-xs text-amber-700">
                       <span className="font-mono font-semibold">{form.placa}</span>
@@ -1068,19 +1035,13 @@ Use 0 para campos numéricos não encontrados e "" para textos. Pesos em KG inte
                 </div>
                 <div>
                   <label className="block text-xs font-medium text-gray-700 mb-1">Motorista</label>
-                  <select value={form.motorista_id} onChange={e => handleMotoristaChange(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm">
-                    <option value="">Selecione...</option>
-                    {motoristasFiltrados.map((c: any) => <option key={c.id} value={c.id}>{c.nome_fantasia || c.nome}</option>)}
-                  </select>
+                  <SearchableSelect value={form.motorista_id} onChange={val => handleMotoristaChange(val)}
+                    options={[{ value: '', label: 'Selecione...' }, ...motoristasFiltrados.map((c: any) => ({ value: c.id, label: c.nome_fantasia || c.nome }))]} placeholder="Motorista" />
                 </div>
                 <div>
                   <label className="block text-xs font-medium text-gray-700 mb-1">Transportadora</label>
-                  <select value={form.transportadora_id} onChange={e => handleTranspChange(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm">
-                    <option value="">Selecione...</option>
-                    {transportadorasList.map((c: any) => <option key={c.id} value={c.id}>{c.nome_fantasia || c.nome}</option>)}
-                  </select>
+                  <SearchableSelect value={form.transportadora_id} onChange={val => handleTranspChange(val)}
+                    options={[{ value: '', label: 'Selecione...' }, ...transportadorasList.map((c: any) => ({ value: c.id, label: c.nome_fantasia || c.nome }))]} placeholder="Transportadora" />
                 </div>
               </div>
 
