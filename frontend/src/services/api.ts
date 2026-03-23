@@ -340,6 +340,7 @@ export const getContratosVenda = async () => {
       corretor:cadastros!contratos_venda_corretor_id_fkey(nome, nome_fantasia),
       produtos(nome, tipo),
       safras(nome),
+      ano_safra(nome),
       local_entrega:cadastros!contratos_venda_local_entrega_id_fkey(nome, nome_fantasia)
     `)
     .order('created_at', { ascending: false })
@@ -350,6 +351,7 @@ export const getContratosVenda = async () => {
     corretor_nome: c.corretor?.nome_fantasia || c.corretor?.nome,
     produto_nome: c.produtos?.nome,
     safra_nome: c.safras?.nome,
+    ano_safra_nome: c.ano_safra?.nome,
     local_entrega_nome: c.local_entrega?.nome_fantasia || c.local_entrega?.nome,
   }))
 }
@@ -371,7 +373,8 @@ export const getComprasInsumo = async () => {
       *,
       fornecedor:cadastros!contratos_compra_insumo_fornecedor_id_fkey(nome, nome_fantasia),
       produtos(nome, tipo),
-      safras(nome)
+      safras(nome),
+      ano_safra(nome)
     `)
     .order('created_at', { ascending: false })
   if (error) throw error
@@ -380,6 +383,7 @@ export const getComprasInsumo = async () => {
     fornecedor_nome: c.fornecedor?.nome_fantasia || c.fornecedor?.nome,
     produto_nome: c.produtos?.nome,
     safra_nome: c.safras?.nome,
+    ano_safra_nome: c.ano_safra?.nome,
   }))
 }
 

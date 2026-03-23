@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { ShoppingCart, Plus, Pencil, Trash2, X, Loader2, Search, FileSpreadsheet, Upload, FileText } from 'lucide-react'
 import toast from 'react-hot-toast'
-import { getContratosVenda, createContratoVenda, updateContratoVenda, deleteContratoVenda, getCadastros, getProdutos, getSafras, getTiposContrato, getUnidadesMedida } from '../services/api'
+import { getContratosVenda, createContratoVenda, updateContratoVenda, deleteContratoVenda, getCadastros, getProdutos, getSafras, getAnosSafra, getTiposContrato, getUnidadesMedida } from '../services/api'
 import SearchableSelect from '../components/SearchableSelect'
 import InfoTooltip from '../components/InfoTooltip'
 import { useSort } from '../hooks/useSort'
@@ -21,7 +21,7 @@ const MODALIDADES = ['FOB', 'CIF']
 const UNIDADES_PRECO = ['R$/ton', 'R$/sc']
 
 const emptyForm = {
-  numero_contrato: '', comprador_id: '', corretor_id: '', produto_id: '', safra_id: '', ano_safra: '',
+  numero_contrato: '', comprador_id: '', corretor_id: '', produto_id: '', safra_id: '', ano_safra_id: '',
   tipo_contrato_id: '', quantidade: '', unidade_medida_id: '', valor_unitario: '', valor_total: '',
   modalidade: 'FOB', data_contrato: '', data_entrega_inicio: '', data_entrega_fim: '', status: 'negociacao',
   local_entrega_id: '', observacoes: '', ativo: true, arquivo_url: '',
@@ -32,6 +32,7 @@ export default function ContratosVenda() {
   const [cadastros, setCadastros] = useState<any[]>([])
   const [produtos, setProdutos] = useState<any[]>([])
   const [safras, setSafras] = useState<any[]>([])
+  const [anosSafra, setAnosSafra] = useState<any[]>([])
   const [tiposContrato, setTiposContrato] = useState<any[]>([])
   const [unidadesMedida, setUnidadesMedida] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
@@ -50,14 +51,16 @@ export default function ContratosVenda() {
       getCadastros(), 
       getProdutos(), 
       getSafras().catch(() => []),
+      getAnosSafra().catch(() => []),
       getTiposContrato().catch(() => []),
       getUnidadesMedida().catch(() => [])
     ])
-      .then(([cv, c, p, s, tc, um]) => { 
+      .then(([cv, c, p, s, as, tc, um]) => { 
         setItems(cv); 
         setCadastros(c); 
         setProdutos(p); 
         setSafras(s);
+        setAnosSafra(as);
         setTiposContrato(tc);
         setUnidadesMedida(um);
       })
@@ -66,8 +69,6 @@ export default function ContratosVenda() {
   }
   useEffect(() => { load() }, [])
 
-  // Extrair anos únicos das safras cadastradas
-  const anosSafra = [...new Set(safras.filter(s => s.ano).map(s => s.ano))].sort((a, b) => b - a)
 
   const compradores = cadastros.filter(c => (c.tipos || []).some((t: string) => ['Comprador', 'Industria', 'Armazem', 'Porto'].includes(t)))
   const corretores = cadastros.filter(c => (c.tipos || []).includes('Corretor'))
@@ -79,7 +80,7 @@ export default function ContratosVenda() {
     setForm({
       numero_contrato: item.numero_contrato || '',
       comprador_id: item.comprador_id || '', corretor_id: item.corretor_id || '',
-      produto_id: item.produto_id || '', safra_id: item.safra_id || '', ano_safra: item.ano_safra || '',
+      produto_id: item.produto_id || '', safra_id: item.safra_id || '', ano_safra_id: item.ano_safra_id || '',
       tipo_contrato_id: item.tipo_contrato_id || '',
       quantidade: item.quantidade != null ? String(item.quantidade) : '',
       unidade_medida_id: item.unidade_medida_id || '',
@@ -155,7 +156,7 @@ export default function ContratosVenda() {
         quantidade,
         valor_unitario: valorUnitario,
         valor_total: valorTotal,
-        ano_safra: form.ano_safra ? parseInt(form.ano_safra) : null,
+        ano_safra_id: form.ano_safra_id || null,
         corretor_id: form.corretor_id || null,
         safra_id: form.safra_id || null,
         tipo_contrato_id: form.tipo_contrato_id || null,
@@ -301,15 +302,15 @@ export default function ContratosVenda() {
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Ano Safra</label>
-                  <SearchableSelect value={form.ano_safra} onChange={val => setForm(f => ({ ...f, ano_safra: val, safra_id: '' }))}
-                    options={[{ value: '', label: 'Todos' }, ...anosSafra.map(ano => ({ value: String(ano), label: String(ano) }))]} placeholder="Ano Safra" />
+                  <SearchableSelect value={form.ano_safra_id} onChange={val => setForm(f => ({ ...f, ano_safra_id: val, safra_id: '' }))}
+                    options={[{ value: '', label: 'Todos' }, ...anosSafra.filter((a: any) => a.ativo).map((a: any) => ({ value: a.id, label: a.nome }))]} placeholder="Ano Safra" />
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Safra</label>
                   <SearchableSelect
                     value={form.safra_id}
                     onChange={(val) => setForm(f => ({ ...f, safra_id: val }))}
-                    options={[{ value: '', label: 'Nenhuma' }, ...safras.filter(s => s.ativo && (!form.ano_safra || s.ano === parseInt(form.ano_safra))).map(s => ({ value: s.id, label: s.nome }))]}
+                    options={[{ value: '', label: 'Nenhuma' }, ...safras.filter(s => s.ativo && (!form.ano_safra_id || s.ano_safra_id === form.ano_safra_id)).map(s => ({ value: s.id, label: s.nome }))]}
                     placeholder="Selecione a safra"
                   />
                 </div>

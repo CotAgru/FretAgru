@@ -2,17 +2,15 @@ import { useEffect, useState } from 'react'
 import { Plus, Pencil, Trash2, X, Settings, Loader2 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import {
-  getAnosSafra, createAnoSafra, updateAnoSafra, deleteAnoSafra,
   getTiposNf, createTipoNf, updateTipoNf, deleteTipoNf,
   getTiposTicket, createTipoTicket, updateTipoTicket, deleteTipoTicket,
   getTiposCaminhao, createTipoCaminhao, updateTipoCaminhao, deleteTipoCaminhao,
 } from '../services/api'
 import { fmtInt } from '../utils/format'
 
-type Tab = 'ano_safra' | 'tipos_nf' | 'tipos_ticket' | 'tipos_caminhao'
+type Tab = 'tipos_nf' | 'tipos_ticket' | 'tipos_caminhao'
 
 const TABS: { key: Tab; label: string }[] = [
-  { key: 'ano_safra', label: 'Ano Safra' },
   { key: 'tipos_nf', label: 'Tipo NF' },
   { key: 'tipos_ticket', label: 'Tipo Ticket' },
   { key: 'tipos_caminhao', label: 'Tipo Caminhão' },
@@ -78,8 +76,7 @@ function SimpleTable({
 }
 
 export default function Admin() {
-  const [tab, setTab] = useState<Tab>('ano_safra')
-  const [anosSafra, setAnosSafra] = useState<any[]>([])
+  const [tab, setTab] = useState<Tab>('tipos_nf')
   const [tiposNf, setTiposNf] = useState<any[]>([])
   const [tiposTicket, setTiposTicket] = useState<any[]>([])
   const [tiposCaminhao, setTiposCaminhao] = useState<any[]>([])
@@ -95,8 +92,8 @@ export default function Admin() {
 
   const load = () => {
     setLoading(true)
-    Promise.all([getAnosSafra(), getTiposNf(), getTiposTicket(), getTiposCaminhao()])
-      .then(([as, tn, tt, tc]) => { setAnosSafra(as); setTiposNf(tn); setTiposTicket(tt); setTiposCaminhao(tc) })
+    Promise.all([getTiposNf(), getTiposTicket(), getTiposCaminhao()])
+      .then(([tn, tt, tc]) => { setTiposNf(tn); setTiposTicket(tt); setTiposCaminhao(tc) })
       .catch(() => toast.error('Erro ao carregar'))
       .finally(() => setLoading(false))
   }
@@ -121,10 +118,7 @@ export default function Admin() {
         payload.eixos = formEixos
         payload.peso_pauta_kg = formPesoPauta
       }
-      if (tab === 'ano_safra') {
-        if (editing) await updateAnoSafra(editing.id, payload)
-        else await createAnoSafra(payload)
-      } else if (tab === 'tipos_nf') {
+      if (tab === 'tipos_nf') {
         if (editing) await updateTipoNf(editing.id, payload)
         else await createTipoNf(payload)
       } else if (tab === 'tipos_ticket') {
@@ -143,15 +137,14 @@ export default function Admin() {
   const remove = async (id: string) => {
     if (!confirm('Deseja remover este registro?')) return
     try {
-      if (tab === 'ano_safra') await deleteAnoSafra(id)
-      else if (tab === 'tipos_nf') await deleteTipoNf(id)
+      if (tab === 'tipos_nf') await deleteTipoNf(id)
       else if (tab === 'tipos_ticket') await deleteTipoTicket(id)
       else await deleteTipoCaminhao(id)
       toast.success('Removido!'); load()
     } catch { toast.error('Erro ao remover') }
   }
 
-  const currentItems = tab === 'ano_safra' ? anosSafra : tab === 'tipos_nf' ? tiposNf : tab === 'tipos_ticket' ? tiposTicket : tiposCaminhao
+  const currentItems = tab === 'tipos_nf' ? tiposNf : tab === 'tipos_ticket' ? tiposTicket : tiposCaminhao
   const currentLabel = TABS.find(t => t.key === tab)?.label || ''
 
   return (
@@ -198,7 +191,7 @@ export default function Admin() {
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Nome *</label>
                 <input type="text" value={formNome} onChange={e => setFormNome(e.target.value)} autoFocus
-                  placeholder={tab === 'ano_safra' ? 'Ex: 25/26' : tab === 'tipos_caminhao' ? 'Ex: Carreta' : 'Ex: Remessa para Depósito'}
+                  placeholder={tab === 'tipos_caminhao' ? 'Ex: Carreta' : 'Ex: Remessa para Depósito'}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent" />
               </div>
               {tab === 'tipos_caminhao' && (
