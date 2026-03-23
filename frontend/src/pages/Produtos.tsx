@@ -3,6 +3,7 @@ import { Plus, Pencil, Trash2, X, Filter, ChevronDown, FileSpreadsheet } from 'l
 import toast from 'react-hot-toast'
 import { getProdutos, createProduto, updateProduto, deleteProduto } from '../services/api'
 import ViewModal, { Field } from '../components/ViewModal'
+import SearchableSelect from '../components/SearchableSelect'
 import { useSort } from '../hooks/useSort'
 import SortHeader from '../components/SortHeader'
 import { exportToExcel } from '../utils/export'
@@ -228,17 +229,13 @@ export default function Produtos() {
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Tipo *</label>
-                  <select value={form.tipo} onChange={e => setForm({...form, tipo: e.target.value})}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent">
-                    {TIPOS.map(t => <option key={t} value={t}>{t}</option>)}
-                  </select>
+                  <SearchableSelect value={form.tipo} onChange={val => setForm({...form, tipo: val})}
+                    options={TIPOS.map(t => ({ value: t, label: t }))} placeholder="Tipo" />
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Unidade</label>
-                  <select value={form.unidade_medida} onChange={e => setForm({...form, unidade_medida: e.target.value})}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent">
-                    {UNIDADES.map(u => <option key={u} value={u}>{u}</option>)}
-                  </select>
+                  <SearchableSelect value={form.unidade_medida} onChange={val => setForm({...form, unidade_medida: val})}
+                    options={UNIDADES.map(u => ({ value: u, label: u }))} placeholder="Unidade" />
                 </div>
               </div>
               <div>

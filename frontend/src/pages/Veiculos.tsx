@@ -3,6 +3,7 @@ import { Plus, Pencil, Trash2, X, Filter, ChevronDown, FileSpreadsheet } from 'l
 import toast from 'react-hot-toast'
 import { getVeiculos, createVeiculo, updateVeiculo, deleteVeiculo, getCadastros, getTiposCaminhao } from '../services/api'
 import ViewModal, { Field } from '../components/ViewModal'
+import SearchableSelect from '../components/SearchableSelect'
 import { useSort } from '../hooks/useSort'
 import SortHeader from '../components/SortHeader'
 import { fmtInt } from '../utils/format'
@@ -264,11 +265,8 @@ export default function Veiculos() {
             <div className="p-4 space-y-3">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Proprietario (Transportadora/Motorista) *</label>
-                <select value={form.cadastro_id} onChange={e => setForm({...form, cadastro_id: e.target.value})}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent">
-                  <option value="">Selecione...</option>
-                  {proprietarios.map((f: any) => <option key={f.id} value={f.id}>{f.nome_fantasia || f.nome}</option>)}
-                </select>
+                <SearchableSelect value={form.cadastro_id} onChange={val => setForm({...form, cadastro_id: val})}
+                  options={[{ value: '', label: 'Selecione...' }, ...proprietarios.map((f: any) => ({ value: f.id, label: f.nome_fantasia || f.nome }))]} placeholder="Proprietário" />
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
@@ -278,10 +276,8 @@ export default function Veiculos() {
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Tipo Caminhao *</label>
-                  <select value={form.tipo_caminhao} onChange={e => onTipoChange(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent">
-                    {tiposCaminhao.map((t: any) => <option key={t.nome} value={t.nome}>{t.nome} ({t.eixos} eixos)</option>)}
-                  </select>
+                  <SearchableSelect value={form.tipo_caminhao} onChange={val => onTipoChange(val)}
+                    options={tiposCaminhao.map((t: any) => ({ value: t.nome, label: `${t.nome} (${t.eixos} eixos)` }))} placeholder="Tipo Caminhão" />
                 </div>
               </div>
 

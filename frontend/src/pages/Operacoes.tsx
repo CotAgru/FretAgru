@@ -4,6 +4,7 @@ import { Plus, Pencil, Trash2, X, FolderOpen, FileText, Calendar } from 'lucide-
 import toast from 'react-hot-toast'
 import { getOperacoes, createOperacao, updateOperacao, deleteOperacao, getAnosSafra } from '../services/api'
 import ViewModal, { Field, Section } from '../components/ViewModal'
+import SearchableSelect from '../components/SearchableSelect'
 
 const STATUS_OPS = [
   { value: 'ativa', label: 'Ativa', color: 'bg-green-100 text-green-700' },
@@ -148,18 +149,13 @@ export default function Operacoes() {
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
-                  <select value={form.status} onChange={e => setForm({...form, status: e.target.value})}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent">
-                    {STATUS_OPS.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
-                  </select>
+                  <SearchableSelect value={form.status} onChange={val => setForm({...form, status: val})}
+                    options={STATUS_OPS.map(s => ({ value: s.value, label: s.label }))} placeholder="Status" />
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Ano Safra</label>
-                  <select value={form.ano_safra_id} onChange={e => setForm({...form, ano_safra_id: e.target.value})}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent">
-                    <option value="">Selecione...</option>
-                    {anosSafra.filter((a: any) => a.ativo).map((a: any) => <option key={a.id} value={a.id}>{a.nome}</option>)}
-                  </select>
+                  <SearchableSelect value={form.ano_safra_id} onChange={val => setForm({...form, ano_safra_id: val})}
+                    options={[{ value: '', label: 'Selecione...' }, ...anosSafra.filter((a: any) => a.ativo).map((a: any) => ({ value: a.id, label: a.nome }))]} placeholder="Ano Safra" />
                 </div>
               </div>
             </div>

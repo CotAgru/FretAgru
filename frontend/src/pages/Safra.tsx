@@ -8,6 +8,7 @@ import {
   getSafras, createSafra, updateSafra, deleteSafra,
 } from '../services/api'
 import { fmtDec, fmtData } from '../utils/format'
+import SearchableSelect from '../components/SearchableSelect'
 import SortHeader from '../components/SortHeader'
 import { useSort } from '../hooks/useSort'
 
@@ -295,30 +296,21 @@ export default function Safra() {
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Ano Safra *</label>
-                  <select value={safraForm.ano_safra_id}
-                    onChange={e => setSafraForm(f => ({ ...f, ano_safra_id: e.target.value }))}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent">
-                    <option value="">Selecione</option>
-                    {anosSafra.filter(a => a.ativo).map(a => <option key={a.id} value={a.id}>{a.nome}</option>)}
-                  </select>
+                  <SearchableSelect value={safraForm.ano_safra_id}
+                    onChange={val => setSafraForm(f => ({ ...f, ano_safra_id: val }))}
+                    options={[{ value: '', label: 'Selecione' }, ...anosSafra.filter(a => a.ativo).map(a => ({ value: a.id, label: a.nome }))]} placeholder="Ano Safra" />
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Cultura *</label>
-                  <select value={safraForm.cultura_id}
-                    onChange={e => setSafraForm(f => ({ ...f, cultura_id: e.target.value }))}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent">
-                    <option value="">Selecione</option>
-                    {culturas.filter(c => c.ativo).map(c => <option key={c.id} value={c.id}>{c.nome}</option>)}
-                  </select>
+                  <SearchableSelect value={safraForm.cultura_id}
+                    onChange={val => setSafraForm(f => ({ ...f, cultura_id: val }))}
+                    options={[{ value: '', label: 'Selecione' }, ...culturas.filter(c => c.ativo).map(c => ({ value: c.id, label: c.nome }))]} placeholder="Cultura" />
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Tipo Safra</label>
-                  <select value={safraForm.tipo_safra_id}
-                    onChange={e => setSafraForm(f => ({ ...f, tipo_safra_id: e.target.value }))}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent">
-                    <option value="">Nenhum</option>
-                    {tiposSafra.filter(t => t.ativo).map(t => <option key={t.id} value={t.id}>{t.nome}</option>)}
-                  </select>
+                  <SearchableSelect value={safraForm.tipo_safra_id}
+                    onChange={val => setSafraForm(f => ({ ...f, tipo_safra_id: val }))}
+                    options={[{ value: '', label: 'Nenhum' }, ...tiposSafra.filter(t => t.ativo).map(t => ({ value: t.id, label: t.nome }))]} placeholder="Tipo Safra" />
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-3">
