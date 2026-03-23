@@ -172,14 +172,19 @@ export default function ContratosVenda() {
       const urlParts = form.arquivo_url.split('/')
       const fileName = urlParts[urlParts.length - 1]
       
+      console.log('DELETE FILE - Enviando:', { bucket: 'contratosdevenda-img', fileName })
+      
       const resp = await fetch('/api/delete-file', {
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ bucket: 'contratosdevenda-img', fileName })
       })
       
+      console.log('DELETE FILE - Resposta status:', resp.status)
+      const data = await resp.json()
+      console.log('DELETE FILE - Resposta data:', data)
+      
       if (!resp.ok) {
-        const data = await resp.json()
         throw new Error(data.error || 'Erro ao remover arquivo')
       }
       

@@ -16,12 +16,16 @@ export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS,PATCH,DELETE,POST,PUT')
   res.setHeader('Access-Control-Allow-Headers', 'X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version')
   
+  console.log('DELETE FILE - Method:', req.method)
+  console.log('DELETE FILE - Body:', req.body)
+  
   if (req.method === 'OPTIONS') {
     res.status(200).end()
     return
   }
 
   if (req.method !== 'DELETE') {
+    console.log('DELETE FILE - Método não permitido:', req.method)
     return res.status(405).json({ error: 'Método não permitido' })
   }
 
@@ -39,9 +43,13 @@ export default async function handler(req, res) {
     }
 
     // Remover arquivo do Supabase Storage
+    console.log('DELETE FILE - Tentando remover:', { bucket, fileName })
+    
     const { error } = await supabase.storage
       .from(bucket)
       .remove([fileName])
+
+    console.log('DELETE FILE - Resultado:', { error })
 
     if (error) {
       console.error('Erro ao remover arquivo:', error)
