@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback, useRef } from 'react'
-import { Plus, Pencil, Trash2, X, Search, Loader2, MapPin, CarFront, ChevronDown, FileSpreadsheet } from 'lucide-react'
+import { Plus, Pencil, Trash2, X, Search, Loader2, MapPin, CarFront, ChevronDown, FileSpreadsheet, Merge } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { getCadastros, createCadastro, updateCadastro, deleteCadastro, createVeiculo, getVeiculos, getTiposCaminhao } from '../services/api'
 import { APIProvider, Map, AdvancedMarker, useMap } from '@vis.gl/react-google-maps'
@@ -127,6 +127,12 @@ export default function Cadastros() {
   const [allVeiculos, setAllVeiculos] = useState<any[]>([])
   const [tiposCaminhao, setTiposCaminhao] = useState<any[]>([])
   const [viewingItem, setViewingItem] = useState<any>(null)
+
+  // Mesclar cadastros
+  const [selectedForMerge, setSelectedForMerge] = useState<string[]>([])
+  const [showMergeModal, setShowMergeModal] = useState(false)
+  const [mergeKeepId, setMergeKeepId] = useState<string | null>(null)
+  const [mergingCadastros, setMergingCadastros] = useState(false)
 
   const load = () => {
     setLoading(true)
@@ -326,6 +332,51 @@ export default function Cadastros() {
   }
   const clearAllFilters = () => { setActiveFilters([]); setBusca('') }
 
+  // Toggle seleção para mesclagem
+  const toggleSelectForMerge = (id: string) => {
+    setSelectedForMerge(prev => 
+      prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]
+    )
+  }
+
+  // Abrir modal de mesclagem
+  const openMergeModal = () => {
+    if (selectedForMerge.length !== 2) {
+      toast.error('Selecione exatamente 2 cadastros para mesclar')
+      return
+    }
+    setMergeKeepId(selectedForMerge[0])
+    setShowMergeModal(true)
+  }
+
+  // Mesclar cadastros
+  const handleMergeCadastros = async () => {
+    if (!mergeKeepId || selectedForMerge.length !== 2) return
+    const removeId = selectedForMerge.find(id => id !== mergeKeepId)
+    if (!removeId) return
+
+    if (!confirm(`Confirma a mesclagem?\n\nCadastro ativo: ${items.find(i => i.id === mergeKeepId)?.nome}\nCadastro que será desativado: ${items.find(i => i.id === removeId)?.nome}\n\nTodos os vínculos serão transferidos.`)) return
+
+    setMergingCadastros(true)
+    try {
+      const resp = await fetch('/api/merge-cadastros', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ keepId: mergeKeepId, removeId })
+      })
+      if (!resp.ok) throw new Error(await resp.text())
+      toast.success('Cadastros mesclados com sucesso!')
+      setShowMergeModal(false)
+      setSelectedForMerge([])
+      setMergeKeepId(null)
+      load()
+    } catch (err: any) {
+      toast.error('Erro ao mesclar: ' + (err?.message || ''))
+    } finally {
+      setMergingCadastros(false)
+    }
+  }
+
   const FILTER_FIELDS = [
     {key: 'nome', label: 'Nome', type: 'text'},
     {key: 'cpf_cnpj', label: 'CPF/CNPJ', type: 'text'},
@@ -397,6 +448,11 @@ export default function Cadastros() {
       <div className="flex items-center justify-between mb-4 sm:mb-6 gap-2">
         <h1 className="text-xl sm:text-2xl font-bold text-gray-800">Cadastros</h1>
         <div className="flex gap-2">
+          {selectedForMerge.length === 2 && (
+            <button onClick={openMergeModal} className="flex items-center gap-2 bg-purple-600 text-white px-3 py-2 rounded-lg hover:bg-purple-700 text-sm font-medium">
+              <Merge className="w-4 h-4" /> Mesclar {selectedForMerge.length}
+            </button>
+          )}
           <button onClick={handleExportExcel} className="flex items-center gap-2 bg-emerald-600 text-white px-3 py-2 rounded-lg hover:bg-emerald-700 text-sm" title="Exportar Excel">
             <FileSpreadsheet className="w-4 h-4" />
             <span className="hidden sm:inline">Excel</span>
@@ -478,6 +534,7 @@ export default function Cadastros() {
           <table className="w-full text-sm min-w-[700px]">
             <thead className="bg-gray-50 border-b">
               <tr>
+                <th className="w-10 px-3 py-3"></th>
                 <SortHeader field="nome" label="Nome" sortKey={sortKey} sortDirection={sortDirection} onSort={toggleSort} />
                 <SortHeader field="cpf_cnpj" label="CPF/CNPJ" sortKey={sortKey} sortDirection={sortDirection} onSort={toggleSort} />
                 <th className="text-left px-4 py-3 font-semibold text-gray-600">Placa</th>
@@ -490,8 +547,17 @@ export default function Cadastros() {
             <tbody className="divide-y">
               {pagination.paginate(sortedFiltered).map(item => {
                 const placas = placasPorCadastro(item.id)
+                const isSelected = selectedForMerge.includes(item.id)
                 return (
-                <tr key={item.id} className="hover:bg-gray-50 cursor-pointer" onClick={() => setViewingItem(item)}>
+                <tr key={item.id} className={`hover:bg-gray-50 cursor-pointer ${isSelected ? 'bg-purple-50' : ''}`} onClick={() => setViewingItem(item)}>
+                  <td className="px-3 py-3" onClick={e => e.stopPropagation()}>
+                    <input 
+                      type="checkbox" 
+                      checked={isSelected}
+                      onChange={() => toggleSelectForMerge(item.id)}
+                      className="w-4 h-4 text-purple-600 rounded focus:ring-purple-500"
+                    />
+                  </td>
                   <td className="px-4 py-3">
                     <div className="font-medium">{item.nome_fantasia || item.nome}</div>
                     {item.nome_fantasia && <div className="text-xs text-gray-400">{item.nome}</div>}
@@ -518,7 +584,7 @@ export default function Cadastros() {
                 </tr>
                 )
               })}
-              {sortedFiltered.length === 0 && <tr><td colSpan={7} className="px-4 py-8 text-center text-gray-400">Nenhum cadastro encontrado</td></tr>}
+              {sortedFiltered.length === 0 && <tr><td colSpan={8} className="px-4 py-8 text-center text-gray-400">Nenhum cadastro encontrado</td></tr>}
             </tbody>
           </table>
           <Pagination
@@ -914,6 +980,89 @@ export default function Cadastros() {
           </dl>
         )}
       </ViewModal>
+
+      {/* Modal de Mesclagem */}
+      {showMergeModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl shadow-2xl max-w-lg w-full p-6">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-xl font-bold text-gray-800 flex items-center gap-2">
+                <Merge className="w-5 h-5 text-purple-600" /> Mesclar Cadastros
+              </h2>
+              <button onClick={() => setShowMergeModal(false)} className="text-gray-400 hover:text-gray-600">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="space-y-4">
+              <p className="text-sm text-gray-600">
+                Selecione qual cadastro deve permanecer <strong>ativo</strong>. O outro será desativado e todos os vínculos (ordens de carregamento, romaneios, preços) serão transferidos para o cadastro ativo.
+              </p>
+
+              {selectedForMerge.map(id => {
+                const cadastro = items.find(i => i.id === id)
+                if (!cadastro) return null
+                return (
+                  <div key={id} className={`border rounded-lg p-4 cursor-pointer transition-all ${mergeKeepId === id ? 'border-purple-500 bg-purple-50 ring-2 ring-purple-200' : 'border-gray-200 hover:border-purple-300'}`}
+                    onClick={() => setMergeKeepId(id)}>
+                    <div className="flex items-start gap-3">
+                      <input 
+                        type="radio" 
+                        checked={mergeKeepId === id}
+                        onChange={() => setMergeKeepId(id)}
+                        className="mt-1 w-4 h-4 text-purple-600"
+                      />
+                      <div className="flex-1">
+                        <div className="font-semibold text-gray-800">{cadastro.nome_fantasia || cadastro.nome}</div>
+                        {cadastro.nome_fantasia && <div className="text-xs text-gray-500">{cadastro.nome}</div>}
+                        <div className="text-sm text-gray-600 mt-1">
+                          {cadastro.cpf_cnpj && <span className="font-mono">{cadastro.cpf_cnpj}</span>}
+                          {cadastro.cidade && <span className="ml-2">• {cadastro.cidade}/{cadastro.uf}</span>}
+                        </div>
+                        {cadastro.tipos && cadastro.tipos.length > 0 && (
+                          <div className="flex gap-1 mt-2">
+                            {cadastro.tipos.map(t => (
+                              <span key={t} className="text-xs px-2 py-0.5 bg-gray-100 text-gray-700 rounded">{t}</span>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                )
+              })}
+
+              <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 flex gap-2">
+                <span className="text-yellow-600 text-xl">⚠️</span>
+                <div className="text-sm text-yellow-800">
+                  <strong>Atenção:</strong> Esta ação não pode ser desfeita. O cadastro não selecionado será marcado como inativo.
+                </div>
+              </div>
+
+              <div className="flex gap-2 justify-end pt-2">
+                <button onClick={() => setShowMergeModal(false)} 
+                  className="px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-lg transition-colors">
+                  Cancelar
+                </button>
+                <button onClick={handleMergeCadastros} disabled={mergingCadastros || !mergeKeepId}
+                  className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2">
+                  {mergingCadastros ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      Mesclando...
+                    </>
+                  ) : (
+                    <>
+                      <Merge className="w-4 h-4" />
+                      Confirmar Mesclagem
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
