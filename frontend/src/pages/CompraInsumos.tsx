@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Package, Plus, Pencil, Trash2, X, Loader2, Search, FileSpreadsheet, Upload, FileText, Settings } from 'lucide-react'
+import { Package, Plus, Pencil, Trash2, X, Loader2, Search, FileSpreadsheet, Upload, FileText, Settings, Eye } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { getComprasInsumo, createCompraInsumo, updateCompraInsumo, deleteCompraInsumo, getCadastros, getProdutos, getSafras, getAnosSafra, getTiposContrato, getUnidadesMedida, syncContratoCompraSafras } from '../services/api'
 import SearchableSelect from '../components/SearchableSelect'
@@ -512,11 +512,18 @@ export default function CompraInsumos() {
                     </div>
                   )}
                   {form.arquivo_url && !selectedFile && (
-                    <a href={form.arquivo_url} target="_blank" rel="noopener noreferrer" 
-                      className="flex items-center gap-2 text-sm text-indigo-600 hover:underline">
-                      <FileText className="w-4 h-4" />
-                      Ver arquivo anexado
-                    </a>
+                    <div className="bg-green-50 border border-green-200 rounded-lg p-3">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <FileText className="w-5 h-5 text-green-600" />
+                          <span className="text-sm text-green-800 font-medium">Arquivo anexado</span>
+                        </div>
+                        <a href={form.arquivo_url} target="_blank" rel="noopener noreferrer" 
+                          className="px-3 py-1 bg-green-600 text-white text-sm rounded hover:bg-green-700 transition-colors flex items-center gap-1">
+                          <Eye className="w-3.5 h-3.5" /> Ver
+                        </a>
+                      </div>
+                    </div>
                   )}
                   {uploadingFile && (
                     <div className="flex items-center gap-2 text-sm text-gray-500">

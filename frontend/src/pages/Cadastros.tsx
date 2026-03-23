@@ -388,6 +388,8 @@ export default function Cadastros() {
   ]
 
   const filtered = items.filter(i => {
+    // Por padrão, esconder cadastros inativos (mesclados)
+    if (i.ativo === false) return false
     // Filtros avançados
     for (const filter of activeFilters) {
       if (!filter.field || !filter.value) continue
