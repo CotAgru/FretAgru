@@ -92,11 +92,12 @@ export default async function handler(req, res) {
     }
 
     // 6. Desativar o cadastro removido
+    const obsAntigas = await getObservacoes(removeId)
     const { error: errorDesativar } = await supabase
       .from('cadastros')
       .update({ 
         ativo: false,
-        observacoes: `[MESCLADO com cadastro ${keepId}]${await getObservacoes(removeId) || ''}`
+        observacoes: `[MESCLADO com cadastro ${keepId}]${obsAntigas || ''}`
       })
       .eq('id', removeId)
 

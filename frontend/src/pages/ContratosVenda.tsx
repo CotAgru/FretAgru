@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { ShoppingCart, Plus, Pencil, Trash2, X, Loader2, Search, FileSpreadsheet } from 'lucide-react'
+import { ShoppingCart, Plus, Pencil, Trash2, X, Loader2, Search, FileSpreadsheet, Upload, FileText } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { getContratosVenda, createContratoVenda, updateContratoVenda, deleteContratoVenda, getCadastros, getProdutos, getSafras } from '../services/api'
 import { useSort } from '../hooks/useSort'
@@ -22,7 +22,7 @@ const emptyForm = {
   numero_contrato: '', comprador_id: '', corretor_id: '', produto_id: '', safra_id: '',
   volume_tons: '', preco_valor: '', preco_unidade: 'R$/ton', modalidade: 'FOB',
   data_contrato: '', data_entrega_inicio: '', data_entrega_fim: '', status: 'negociacao',
-  local_entrega_id: '', observacoes: '', ativo: true,
+  local_entrega_id: '', observacoes: '', ativo: true, arquivo_url: '',
 }
 
 export default function ContratosVenda() {
@@ -36,6 +36,8 @@ export default function ContratosVenda() {
   const [form, setForm] = useState(emptyForm)
   const [saving, setSaving] = useState(false)
   const [busca, setBusca] = useState('')
+  const [uploadingFile, setUploadingFile] = useState(false)
+  const [selectedFile, setSelectedFile] = useState<File | null>(null)
 
   const load = () => {
     setLoading(true)
@@ -50,7 +52,7 @@ export default function ContratosVenda() {
   const corretores = cadastros.filter(c => (c.tipos || []).includes('Corretor'))
   const locaisEntrega = cadastros.filter(c => (c.tipos || []).some((t: string) => ['Armazem', 'Industria', 'Porto', 'Fazenda'].includes(t)))
 
-  const openNew = () => { setEditing(null); setForm(emptyForm); setShowForm(true) }
+  const openNew = () => { setEditing(null); setForm(emptyForm); setSelectedFile(null); setShowForm(true) }
   const openEdit = (item: any) => {
     setEditing(item)
     setForm({
@@ -63,9 +65,51 @@ export default function ContratosVenda() {
       data_contrato: item.data_contrato || '', data_entrega_inicio: item.data_entrega_inicio || '',
       data_entrega_fim: item.data_entrega_fim || '', status: item.status || 'negociacao',
       local_entrega_id: item.local_entrega_id || '', observacoes: item.observacoes || '',
-      ativo: item.ativo,
+      ativo: item.ativo, arquivo_url: item.arquivo_url || '',
     })
+    setSelectedFile(null)
     setShowForm(true)
+  }
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (file) {
+      const maxSize = 10 * 1024 * 1024 // 10MB
+      if (file.size > maxSize) {
+        toast.error('Arquivo muito grande. Máximo 10MB')
+        return
+      }
+      setSelectedFile(file)
+    }
+  }
+
+  const uploadFile = async (): Promise<string | null> => {
+    if (!selectedFile) return form.arquivo_url || null
+    
+    setUploadingFile(true)
+    try {
+      const timestamp = Date.now()
+      const fileName = `${timestamp}_${selectedFile.name.replace(/[^a-zA-Z0-9._-]/g, '_')}`
+      
+      const formData = new FormData()
+      formData.append('file', selectedFile)
+      formData.append('bucket', 'contratosdevenda-img')
+      formData.append('fileName', fileName)
+      
+      const resp = await fetch('/api/upload-file', {
+        method: 'POST',
+        body: formData
+      })
+      
+      if (!resp.ok) throw new Error('Erro ao fazer upload')
+      const data = await resp.json()
+      return data.publicUrl
+    } catch (err: any) {
+      toast.error('Erro ao fazer upload: ' + (err?.message || ''))
+      return null
+    } finally {
+      setUploadingFile(false)
+    }
   }
 
   const save = async () => {
@@ -74,6 +118,9 @@ export default function ContratosVenda() {
     }
     setSaving(true)
     try {
+      // Upload do arquivo se houver
+      const arquivoUrl = await uploadFile()
+      
       const payload: any = {
         ...form,
         volume_tons: parseFloat(form.volume_tons),
@@ -86,6 +133,7 @@ export default function ContratosVenda() {
         data_entrega_fim: form.data_entrega_fim || null,
         observacoes: form.observacoes || null,
         numero_contrato: form.numero_contrato || null,
+        arquivo_url: arquivoUrl || null,
       }
       if (editing) await updateContratoVenda(editing.id, payload)
       else await createContratoVenda(payload)
@@ -322,6 +370,41 @@ export default function ContratosVenda() {
                 <textarea value={form.observacoes} onChange={e => setForm(f => ({ ...f, observacoes: e.target.value }))} rows={2}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
               </div>
+              
+              {/* Upload de Arquivo */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1 flex items-center gap-2">
+                  <Upload className="w-4 h-4" /> Anexar Arquivo (PDF, Imagem - máx 10MB)
+                </label>
+                <div className="space-y-2">
+                  <input 
+                    type="file" 
+                    accept=".pdf,.jpg,.jpeg,.png,.doc,.docx"
+                    onChange={handleFileChange}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm file:mr-4 file:py-1 file:px-3 file:rounded file:border-0 file:text-sm file:font-medium file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
+                  />
+                  {selectedFile && (
+                    <div className="flex items-center gap-2 text-sm text-green-600">
+                      <FileText className="w-4 h-4" />
+                      {selectedFile.name} ({(selectedFile.size / 1024 / 1024).toFixed(2)} MB)
+                    </div>
+                  )}
+                  {form.arquivo_url && !selectedFile && (
+                    <a href={form.arquivo_url} target="_blank" rel="noopener noreferrer" 
+                      className="flex items-center gap-2 text-sm text-blue-600 hover:underline">
+                      <FileText className="w-4 h-4" />
+                      Ver arquivo anexado
+                    </a>
+                  )}
+                  {uploadingFile && (
+                    <div className="flex items-center gap-2 text-sm text-gray-500">
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      Fazendo upload...
+                    </div>
+                  )}
+                </div>
+              </div>
+
               <div className="flex items-center gap-2">
                 <input type="checkbox" checked={form.ativo} onChange={e => setForm(f => ({ ...f, ativo: e.target.checked }))}
                   className="rounded border-gray-300 text-blue-600 focus:ring-blue-500" />

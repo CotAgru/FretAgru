@@ -553,30 +553,60 @@ export default function Integracoes() {
       for (const cad of cadastros) {
         if (cad.aegro_company_key) {
           const aegroMatch = normalizedCompanies.find((co: any) => co.key === cad.aegro_company_key)
-          syncs.push({
-            aegroKey: cad.aegro_company_key,
-            aegroName: aegroMatch?.name || null,
-            aegroTradeName: aegroMatch?.tradeName || null,
-            aegroCpfCnpj: aegroMatch?.cpfCnpj || null,
-            aegroPhone: aegroMatch?.phone || null,
-            aegroState: aegroMatch?.state || null,
-            aegroCity: aegroMatch?.city || null,
-            aegroRaw: aegroMatch || null,
-            iagruId: cad.id,
-            iagruNome: cad.nome,
-            iagruNomeFantasia: cad.nome_fantasia,
-            iagruCpfCnpj: cad.cpf_cnpj,
-            iagruTelefone: cad.telefone1,
-            iagruUf: cad.uf,
-            iagruCidade: cad.cidade,
-            iagruCodigoIbge: cad.codigo_ibge,
-            iagruTipos: cad.tipos || [],
-            status: 'linked',
-            matchField: 'aegro_company_key',
-            processing: false, done: false, error: null,
-          })
-          usedCadIds.add(cad.id)
-          if (aegroMatch) usedAegroKeys.add(aegroMatch.key)
+          
+          // VALIDAÇÃO: Se vinculado mas não existe mais no Aegro
+          if (!aegroMatch) {
+            syncs.push({
+              aegroKey: cad.aegro_company_key,
+              aegroName: null,
+              aegroTradeName: null,
+              aegroCpfCnpj: null,
+              aegroPhone: null,
+              aegroState: null,
+              aegroCity: null,
+              aegroRaw: null,
+              iagruId: cad.id,
+              iagruNome: cad.nome,
+              iagruNomeFantasia: cad.nome_fantasia,
+              iagruCpfCnpj: cad.cpf_cnpj,
+              iagruTelefone: cad.telefone1,
+              iagruUf: cad.uf,
+              iagruCidade: cad.cidade,
+              iagruCodigoIbge: cad.codigo_ibge,
+              iagruTipos: cad.tipos || [],
+              status: 'only_iagru',
+              matchField: null,
+              processing: false, 
+              done: false, 
+              error: `⚠️ Cadastro vinculado ao Aegro (${cad.aegro_company_key}) mas não encontrado. Foi deletado no Aegro? Clique em "Desvincular" para limpar.`,
+            })
+            usedCadIds.add(cad.id)
+          } else {
+            syncs.push({
+              aegroKey: cad.aegro_company_key,
+              aegroName: aegroMatch.name || null,
+              aegroTradeName: aegroMatch.tradeName || null,
+              aegroCpfCnpj: aegroMatch.cpfCnpj || null,
+              aegroPhone: aegroMatch.phone || null,
+              aegroState: aegroMatch.state || null,
+              aegroCity: aegroMatch.city || null,
+              aegroRaw: aegroMatch || null,
+              iagruId: cad.id,
+              iagruNome: cad.nome,
+              iagruNomeFantasia: cad.nome_fantasia,
+              iagruCpfCnpj: cad.cpf_cnpj,
+              iagruTelefone: cad.telefone1,
+              iagruUf: cad.uf,
+              iagruCidade: cad.cidade,
+              iagruCodigoIbge: cad.codigo_ibge,
+              iagruTipos: cad.tipos || [],
+              status: 'linked',
+              matchField: 'aegro_company_key',
+              processing: false, done: false, error: null,
+            })
+            usedCadIds.add(cad.id)
+            usedAegroKeys.add(aegroMatch.key)
+          }
         }
       }
 
@@ -1017,23 +1047,29 @@ export default function Integracoes() {
 
           {/* Sincronização */}
           {isConnected && (
-            <div className="border-t pt-4 mt-4">
-              <div className="flex items-center justify-between mb-3">
+            <div className="border-t pt-4 mt-4 space-y-6">
+              <div className="flex items-center justify-between">
                 <p className="text-sm font-medium text-gray-700 flex items-center gap-1.5">
                   <BarChart3 className="w-4 h-4 text-green-600" /> Sincronização de dados
                 </p>
-                {syncStats && !syncStats.loading && (
-                  <button onClick={() => loadSyncStats(token)} className="text-[11px] text-gray-400 hover:text-green-600 flex items-center gap-1">
-                    <RefreshCw className="w-3 h-3" /> atualizar
-                  </button>
-                )}
               </div>
 
-              {/* Dashboard de stats - Safras */}
+              {/* 1. SAFRAS (CROPS) */}
+              <div className="border border-green-200 rounded-lg p-4 bg-green-50/30">
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="text-sm font-semibold text-green-800 flex items-center gap-2">
+                    🌾 Safras (Crops)
+                  </h3>
+                  {syncStats && !syncStats.loading && (
+                    <button onClick={() => loadSyncStats(token)} className="text-[11px] text-gray-400 hover:text-green-600 flex items-center gap-1">
+                      <RefreshCw className="w-3 h-3" /> atualizar
+                    </button>
+                  )}
+                </div>
+
               {syncStats && (
                 <>
-                  <p className="text-xs text-gray-500 font-medium mb-2">Safras (Crops)</p>
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-4">
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-3">
                     <div className="bg-blue-50 border border-blue-200 rounded-lg p-2.5 text-center">
                       <p className="text-lg font-bold text-blue-700">
                         {syncStats.loading ? <Loader2 className="w-4 h-4 animate-spin mx-auto" /> : syncStats.totalAegro}
@@ -1059,14 +1095,44 @@ export default function Integracoes() {
                       <p className="text-[10px] text-yellow-600 font-medium uppercase tracking-wide">Alteradas</p>
                     </div>
                   </div>
+                  <button onClick={handleOpenImportCrops} disabled={loadingCrops}
+                    className="w-full px-4 py-2 border border-green-300 text-green-700 rounded-lg text-sm font-medium bg-white hover:bg-green-50 transition-colors disabled:opacity-60">
+                    {loadingCrops ? <span className="flex items-center gap-2 justify-center"><Loader2 className="w-4 h-4 animate-spin" /> Carregando...</span> : 'Importar Safras do Aegro'}
+                  </button>
+                  {importResult && (
+                    <div className="mt-2 bg-green-100 border border-green-300 rounded-lg p-2">
+                      <p className="text-xs text-green-700 font-medium">✓ {importResult.total} safras processadas</p>
+                    </div>
+                  )}
+                  <p className="text-[10px] text-gray-500 mt-1">As safras ficam vinculadas pelo crop_key. Re-importar atualiza sem duplicar.</p>
                 </>
               )}
+              </div>
 
-              {/* Dashboard de stats - Cadastros */}
+              {/* 2. PRODUTOS (ELEMENTS) */}
+              <div className="border border-gray-200 rounded-lg p-4 bg-gray-50/30">
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="text-sm font-semibold text-gray-700 flex items-center gap-2">
+                    📦 Produtos (Elements)
+                  </h3>
+                </div>
+                <button disabled className="w-full px-4 py-2 border border-gray-300 text-gray-500 rounded-lg text-sm font-medium bg-white opacity-60 cursor-not-allowed">
+                  Em breve - Importar Produtos
+                </button>
+                <p className="text-[10px] text-gray-500 mt-1">Funcionalidade em desenvolvimento</p>
+              </div>
+
+              {/* 3. CADASTROS (COMPANIES) */}
+              <div className="border border-purple-200 rounded-lg p-4 bg-purple-50/30">
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="text-sm font-semibold text-purple-800 flex items-center gap-2">
+                    <Building2 className="w-4 h-4" /> Cadastros (Companies)
+                  </h3>
+                </div>
+
               {companySyncs.length > 0 && (
                 <>
-                  <p className="text-xs text-gray-500 font-medium mb-2">Cadastros (Companies)</p>
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-4">
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-3">
                     <div className="bg-purple-50 border border-purple-200 rounded-lg p-2.5 text-center">
                       <p className="text-lg font-bold text-purple-700">
                         {companySyncs.filter(s => s.status === 'match_suggestion').length}
@@ -1094,28 +1160,13 @@ export default function Integracoes() {
                   </div>
                 </>
               )}
-
-              {/* Botões de ação */}
-              <div className="flex flex-wrap gap-2">
-                <button onClick={handleOpenImportCrops} disabled={loadingCrops}
-                  className="px-4 py-2 border border-green-300 text-green-700 rounded-lg text-sm font-medium bg-green-50 hover:bg-green-100 transition-colors disabled:opacity-60">
-                  {loadingCrops ? <span className="flex items-center gap-2"><Loader2 className="w-4 h-4 animate-spin" /> Carregando...</span> : 'Importar Safras (crops)'}
-                </button>
-                <button disabled className="px-4 py-2 border border-green-300 text-green-700 rounded-lg text-sm font-medium bg-green-50 opacity-60 cursor-not-allowed">
-                  Importar Produtos (elements)
-                </button>
+              
                 <button onClick={handleOpenSyncCadastros} disabled={loadingSyncCad}
-                  className="px-4 py-2 border border-green-300 text-green-700 rounded-lg text-sm font-medium bg-green-50 hover:bg-green-100 transition-colors disabled:opacity-60">
-                  {loadingSyncCad ? <span className="flex items-center gap-2"><Loader2 className="w-4 h-4 animate-spin" /> Carregando...</span> : <span className="flex items-center gap-2"><Building2 className="w-4 h-4" /> Sync Cadastros</span>}
+                  className="w-full px-4 py-2 border border-purple-300 text-purple-700 rounded-lg text-sm font-medium bg-white hover:bg-purple-50 transition-colors disabled:opacity-60">
+                  {loadingSyncCad ? <span className="flex items-center gap-2 justify-center"><Loader2 className="w-4 h-4 animate-spin" /> Carregando...</span> : <span className="flex items-center gap-2 justify-center"><Building2 className="w-4 h-4" /> Sincronizar Cadastros</span>}
                 </button>
+                <p className="text-[10px] text-gray-500 mt-1">Vincule, envie ou importe cadastros entre iAgru e Aegro</p>
               </div>
-              {importResult && (
-                <div className="mt-3 bg-green-50 border border-green-200 rounded-lg p-3">
-                  <p className="text-sm text-green-700 font-medium">Importação concluída!</p>
-                  <p className="text-xs text-green-600 mt-1">{importResult.total} safras processadas. Acesse a página Safra para visualizar.</p>
-                </div>
-              )}
-              <p className="text-xs text-gray-400 mt-2">As safras importadas ficam vinculadas ao Aegro pelo crop_key. Re-importar atualiza os dados sem duplicar.</p>
             </div>
           )}
 
