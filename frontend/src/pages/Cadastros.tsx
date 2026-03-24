@@ -387,9 +387,11 @@ export default function Cadastros() {
     {key: 'ativo', label: 'Ativo', type: 'select', options: () => ['Sim', 'Não']},
   ]
 
+  const hasAtivoFilter = activeFilters.some(f => f.field === 'ativo' && f.value)
+
   const filtered = items.filter(i => {
-    // Por padrão, esconder cadastros inativos (mesclados)
-    if (i.ativo === false) return false
+    // Por padrão, esconder cadastros inativos (mesclados) — exceto se houver filtro 'ativo' explícito
+    if (!hasAtivoFilter && i.ativo === false) return false
     // Filtros avançados
     for (const filter of activeFilters) {
       if (!filter.field || !filter.value) continue

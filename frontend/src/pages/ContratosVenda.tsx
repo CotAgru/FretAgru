@@ -164,35 +164,31 @@ export default function ContratosVenda() {
 
   const deleteFile = async () => {
     if (!form.arquivo_url) return
-    
     if (!confirm('Deseja remover o arquivo anexado?')) return
-    
+
     try {
-      // Extrair nome do arquivo da URL
       const urlParts = form.arquivo_url.split('/')
       const fileName = urlParts[urlParts.length - 1]
-      
-      console.log('DELETE FILE - Enviando:', { bucket: 'contratosdevenda-img', fileName })
-      
+
       const resp = await fetch('/api/delete-file', {
-        method: 'DELETE',
+        method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ bucket: 'contratosdevenda-img', fileName })
       })
-      
-      console.log('DELETE FILE - Resposta status:', resp.status)
-      const data = await resp.json()
-      console.log('DELETE FILE - Resposta data:', data)
-      
+
       if (!resp.ok) {
+        const data = await resp.json()
         throw new Error(data.error || 'Erro ao remover arquivo')
       }
-      
-      // Limpar URL do arquivo no formulário
+
+      // Persistir remoção no banco se estiver editando
+      if (editing) {
+        await updateContratoVenda(editing.id, { arquivo_url: null })
+      }
+
       setForm(prev => ({ ...prev, arquivo_url: '' }))
       toast.success('Arquivo removido com sucesso!')
     } catch (err: any) {
-      console.error('Erro ao remover arquivo:', err)
       toast.error(`Erro ao remover arquivo: ${err?.message || 'Erro desconhecido'}`)
     }
   }

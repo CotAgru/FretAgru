@@ -10,23 +10,18 @@ if (!supabaseUrl || !supabaseKey) {
 const supabase = createClient(supabaseUrl, supabaseKey)
 
 export default async function handler(req, res) {
-  // CORS
   res.setHeader('Access-Control-Allow-Credentials', 'true')
   res.setHeader('Access-Control-Allow-Origin', '*')
-  res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS,PATCH,DELETE,POST,PUT')
-  res.setHeader('Access-Control-Allow-Headers', 'X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version')
-  
-  console.log('DELETE FILE - Method:', req.method)
-  console.log('DELETE FILE - Body:', req.body)
-  
+  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS')
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type')
+
   if (req.method === 'OPTIONS') {
     res.status(200).end()
     return
   }
 
-  if (req.method !== 'DELETE') {
-    console.log('DELETE FILE - Método não permitido:', req.method)
-    return res.status(405).json({ error: 'Método não permitido' })
+  if (req.method !== 'POST') {
+    return res.status(405).json({ error: 'Método não permitido. Use POST.' })
   }
 
   try {
@@ -36,20 +31,14 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: 'bucket e fileName são obrigatórios' })
     }
 
-    // Validar buckets permitidos
     const allowedBuckets = ['contratosdevenda-img', 'contratosdecompra-img']
     if (!allowedBuckets.includes(bucket)) {
       return res.status(400).json({ error: 'Bucket não permitido' })
     }
 
-    // Remover arquivo do Supabase Storage
-    console.log('DELETE FILE - Tentando remover:', { bucket, fileName })
-    
     const { error } = await supabase.storage
       .from(bucket)
       .remove([fileName])
-
-    console.log('DELETE FILE - Resultado:', { error })
 
     if (error) {
       console.error('Erro ao remover arquivo:', error)
