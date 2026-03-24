@@ -54,29 +54,41 @@ iAgru/
 │       ├── pages/           # Páginas de todos os módulos
 │       ├── services/        # API (Supabase queries)
 │       └── utils/           # Utilitários (format, export, importHelpers)
-├── supabase/                # Migrations SQL (v1 a v11)
+├── supabase/                # Migrations SQL (v1 a v24)
 └── docs/                    # Documentação e planos
 ```
+
+> Documentação técnica consolidada: [../PROJETO-MEMORIA-CONTEXTO.md](../PROJETO-MEMORIA-CONTEXTO.md)
 
 ---
 
 ## Módulo FretAgru — Funcionalidades
 
-- **Dashboard Fretes** — Cards de resumo + gráficos (peso mensal, status ordens, peso por produto, top rotas, evolução diária)
+- **Dashboard BI Fretes** — BI completo estilo Power BI:
+  - 5 KPIs: Total Viagens, Vol. s/Desc, Vol. c/Desc, Vlr Unit Médio, Vlr Total a Pagar
+  - Seletor de unidade KG/SC/TN (padrão SC) com conversão automática
+  - 8 filtros globais interativos (Ano Safra, Safra, Produto, Origem, Destino, Transportadora, Motorista, Placa)
+  - 4 gráficos: Volume mensal, Valor frete mensal, Volume por produto, Status ordens
+  - Tabela analítica por Transportadora/Placa/Motorista com ordenação e % do total
+  - Tabela por Rota (Origem → Destino)
+  - Análise de Descontos por Origem (7 tipos abertos, % desconto com badges coloridos)
+  - Frete Excedente — Custo do Volume Não Vendável (mini-cards + tabela por rota)
+  - Todas as linhas clicáveis → filtram automaticamente
 - **Operações** — Gerenciar operações de colheita/transporte por safra
 - **Ordens de Carregamento** — Controlar ordens com origem, destino, produto, transportadores
-- **Romaneios** — Tickets de pesagem com pesos, descontos de qualidade, cálculo de frete
+- **Romaneios** — Tickets de pesagem com pesos, 7 tipos de desconto (decimais), cálculo de frete, seletor KG/TN/SC
 - **Veículos** — Cadastro de caminhões (placa, tipo, eixos, peso pauta)
 - **Preços Contratados** — Tabelas de frete por rota/produto/fornecedor com cálculo de distância
 - **Importação** — Wizard de 7 etapas para importar dados históricos via planilha Excel
 
 ---
 
-## Módulo ContAgru — Funcionalidades (em desenvolvimento)
+## Módulo ContAgru — Funcionalidades (MVP funcional)
 
 - **Dashboard Contratos** — Visão geral de contratos de venda e compra
 - **Contratos de Venda** — Venda futura de commodities (comprador, corretor, volume, preço, FOB/CIF)
 - **Compra de Insumos** — Contratos de compra de fertilizantes, defensivos, sementes
+- **Vinculação FretAgru ↔ ContAgru** — Campo `contrato_venda_id` em romaneios (migration v24)
 
 ---
 
