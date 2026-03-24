@@ -141,7 +141,20 @@ export default function Romaneios() {
   ]
   const [columns, setColumns] = useState(() => {
     const saved = localStorage.getItem('romaneios_columns')
-    return saved ? JSON.parse(saved) : DEFAULT_COLUMNS
+    if (!saved) return DEFAULT_COLUMNS
+    
+    const savedCols = JSON.parse(saved)
+    // Merge: adicionar novas colunas que não existem no localStorage
+    const savedKeys = new Set(savedCols.map((c: any) => c.key))
+    const newCols = DEFAULT_COLUMNS.filter(c => !savedKeys.has(c.key))
+    const merged = [...savedCols, ...newCols]
+    
+    // Se houve merge, salvar de volta
+    if (newCols.length > 0) {
+      localStorage.setItem('romaneios_columns', JSON.stringify(merged))
+    }
+    
+    return merged
   })
 
   const load = () => {
@@ -522,6 +535,18 @@ Use 0 para campos numéricos não encontrados e "" para textos. Pesos em KG inte
   const motoristasFiltrados = form.transportadora_id
     ? motoristasList.filter((m: any) => m.transportador_id === form.transportadora_id)
     : motoristasList
+
+  // Contratos de venda filtrados pelo ano safra selecionado
+  const contratosFiltrados = form.ano_safra_id
+    ? contratosVenda.filter((cv: any) => {
+        // Verificar se o contrato tem safras relacionadas ao ano safra selecionado
+        const safrasDoContrato = cv.contrato_venda_safras || []
+        return safrasDoContrato.some((cvs: any) => {
+          const safra = safras.find(s => s.id === cvs.safra_id)
+          return safra?.ano_safra_id === form.ano_safra_id
+        })
+      })
+    : contratosVenda
 
   // Configuração de colunas
   const [dragIndex, setDragIndex] = useState<number | null>(null)
@@ -1024,7 +1049,7 @@ Use 0 para campos numéricos não encontrados e "" para textos. Pesos em KG inte
                 <div>
                   <label className="block text-xs font-medium text-gray-700 mb-1">Contrato de Venda</label>
                   <SearchableSelect value={form.contrato_venda_id} onChange={val => setForm({...form, contrato_venda_id: val})}
-                    options={[{ value: '', label: 'Nenhum' }, ...contratosVenda.map((cv: any) => ({ value: cv.id, label: `${cv.numero_contrato || 'S/N'} - ${cv.comprador?.nome_fantasia || cv.comprador?.nome || ''} (${cv.produtos?.nome || ''})` }))]} placeholder="Contrato de Venda" />
+                    options={[{ value: '', label: 'Nenhum' }, ...contratosFiltrados.map((cv: any) => ({ value: cv.id, label: `${cv.numero_contrato || 'S/N'} - ${cv.comprador?.nome_fantasia || cv.comprador?.nome || ''} (${cv.produtos?.nome || ''})` }))]} placeholder="Contrato de Venda" />
                 </div>
                 <div>
                   <label className="block text-xs font-medium text-gray-700 mb-1">Transgenia</label>
