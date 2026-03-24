@@ -260,7 +260,7 @@ export default function Romaneios() {
     if (!ordem?.preco_id) return { valor: null, label: '-' }
     const preco = precos.find((p: any) => p.id === ordem.preco_id)
     if (!preco?.valor) return { valor: null, label: '-' }
-    const pesoKg = item.peso_corrigido || item.peso_liquido || 0
+    const pesoKg = item.peso_liquido || 0 // Frete é pago sobre peso líquido SEM desconto
     if (!pesoKg) return { valor: null, label: '-' }
     let valorFrete = 0
     switch (preco.unidade_preco) {
