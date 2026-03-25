@@ -735,3 +735,57 @@ export const updateRomaneioArmazem = async (id: string, data: any) =>
 
 export const deleteRomaneioArmazem = async (id: string) =>
   throwIfError(await supabase.from('romaneios_armazem').update({ ativo: false }).eq('id', id))
+
+// ============================================================
+// === SILAGRU — QUEBRA TÉCNICA ===
+// ============================================================
+export const getQuebraTecnica = async () => {
+  const { data, error } = await supabase
+    .from('quebra_tecnica')
+    .select(`
+      *,
+      depositante:cadastros!quebra_tecnica_depositante_id_fkey(nome, nome_fantasia),
+      produto:produtos!quebra_tecnica_produto_id_fkey(nome)
+    `)
+    .order('data_calculo', { ascending: false })
+  if (error) throw error
+  return (data || []).map((q: any) => ({
+    ...q,
+    depositante_nome: q.depositante?.nome_fantasia || q.depositante?.nome,
+    produto_nome: q.produto?.nome,
+  }))
+}
+
+export const calcularQuebraTecnica = async (data: any) =>
+  throwIfError(await supabase.from('quebra_tecnica').insert(data).select().single())
+
+// ============================================================
+// === SILAGRU — COBRANÇAS DE ARMAZENAGEM ===
+// ============================================================
+export const getCobrancas = async () => {
+  const { data, error } = await supabase
+    .from('cobrancas_armazenagem')
+    .select(`
+      *,
+      depositante:cadastros!cobrancas_armazenagem_depositante_id_fkey(nome, nome_fantasia),
+      produto:produtos(nome),
+      unidade:unidades_armazenadoras!cobrancas_armazenagem_unidade_id_fkey(nome)
+    `)
+    .order('created_at', { ascending: false })
+  if (error) throw error
+  return (data || []).map((c: any) => ({
+    ...c,
+    depositante_nome: c.depositante?.nome_fantasia || c.depositante?.nome,
+    produto_nome: c.produto?.nome,
+    unidade_nome: c.unidade?.nome,
+  }))
+}
+
+export const createCobranca = async (data: any) =>
+  throwIfError(await supabase.from('cobrancas_armazenagem').insert(data).select().single())
+
+export const updateCobranca = async (id: string, data: any) =>
+  throwIfError(await supabase.from('cobrancas_armazenagem').update(data).eq('id', id).select().single())
+
+export const deleteCobranca = async (id: string) =>
+  throwIfError(await supabase.from('cobrancas_armazenagem').delete().eq('id', id))

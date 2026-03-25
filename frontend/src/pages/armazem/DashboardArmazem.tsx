@@ -1,6 +1,7 @@
 import { useEffect, useState, useMemo } from 'react'
-import { Warehouse, Package, TrendingUp, TrendingDown, Users, Scale, ArrowUp, ArrowDown, ArrowUpDown } from 'lucide-react'
-import { getRomaneiosArmazem, getUnidadesArmazenadoras, getProdutos, getCadastros } from '../../services/api'
+import { Warehouse, Package, TrendingUp, TrendingDown, Users, Scale, ArrowUp, ArrowDown, ArrowUpDown, CreditCard } from 'lucide-react'
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts'
+import { getRomaneiosArmazem, getUnidadesArmazenadoras, getProdutos, getCadastros, getCobrancas, getQuebraTecnica } from '../../services/api'
 import { fmtInt, fmtDec, fmtBRL } from '../../utils/format'
 
 type SortDir = 'asc' | 'desc'
@@ -10,6 +11,8 @@ export default function DashboardArmazem() {
   const [unidades, setUnidades] = useState<any[]>([])
   const [produtos, setProdutos] = useState<any[]>([])
   const [cadastros, setCadastros] = useState<any[]>([])
+  const [cobrancas, setCobrancas] = useState<any[]>([])
+  const [quebras, setQuebras] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [unidadeSel, setUnidadeSel] = useState('KG')
 
@@ -19,11 +22,15 @@ export default function DashboardArmazem() {
       getUnidadesArmazenadoras(),
       getProdutos(),
       getCadastros(),
-    ]).then(([r, u, p, c]) => {
+      getCobrancas(),
+      getQuebraTecnica(),
+    ]).then(([r, u, p, c, cob, q]) => {
       setRomaneios(r)
       setUnidades(u)
       setProdutos(p)
       setCadastros(c)
+      setCobrancas(cob)
+      setQuebras(q)
     }).finally(() => setLoading(false))
   }, [])
 
@@ -41,6 +48,28 @@ export default function DashboardArmazem() {
   const estoqueTotal = totalEntradas - totalSaidas
 
   const totalDescontos = entradas.reduce((s, r) => s + (r.desconto_total || 0), 0)
+  const totalQuebraAcum = quebras.reduce((s: number, q: any) => s + (q.quebra_kg || 0), 0)
+  const totalCobAberto = cobrancas.filter((c: any) => c.status === 'aberto').reduce((s: number, c: any) => s + (c.valor_total || 0), 0)
+  const totalCobPago = cobrancas.filter((c: any) => c.status === 'pago').reduce((s: number, c: any) => s + (c.valor_total || 0), 0)
+
+  // Movimentação mensal (para gráfico)
+  const movMensal = useMemo(() => {
+    const map: Record<string, { mes: string, entradas: number, saidas: number }> = {}
+    const ativos = romaneios.filter(r => r.status !== 'cancelado' && r.data_emissao)
+    ativos.forEach(r => {
+      const d = new Date(r.data_emissao)
+      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+      const label = d.toLocaleDateString('pt-BR', { month: 'short', year: '2-digit' })
+      if (!map[key]) map[key] = { mes: label, entradas: 0, saidas: 0 }
+      if (r.tipo === 'entrada') map[key].entradas += r.peso_corrigido || 0
+      else if (r.tipo === 'saida') map[key].saidas += r.peso_corrigido || 0
+    })
+    return Object.entries(map)
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([, v]) => ({ ...v, entradas: conv(v.entradas), saidas: conv(v.saidas) }))
+  }, [romaneios, unidadeSel])
+
+  const CORES_PIE = ['#d97706', '#059669', '#2563eb', '#dc2626', '#7c3aed', '#ea580c', '#0891b2']
 
   // Estoque por produto
   const estoquePorProduto = useMemo(() => {
@@ -166,6 +195,81 @@ export default function DashboardArmazem() {
               <p className="text-lg font-bold text-gray-800">{fmtDec(conv(totalDescontos))} {unidadeSel}</p>
             </div>
           </div>
+        </div>
+      </div>
+
+      {/* KPIs extras */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4">
+          <div className="flex items-center gap-3">
+            <div className="p-2 bg-orange-100 rounded-lg"><TrendingDown className="w-5 h-5 text-orange-600" /></div>
+            <div>
+              <p className="text-xs text-gray-500">Quebra T\u00e9cnica Acumulada</p>
+              <p className="text-lg font-bold text-orange-600">{fmtDec(conv(totalQuebraAcum))} {unidadeSel}</p>
+            </div>
+          </div>
+        </div>
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4">
+          <div className="flex items-center gap-3">
+            <div className="p-2 bg-yellow-100 rounded-lg"><CreditCard className="w-5 h-5 text-yellow-600" /></div>
+            <div>
+              <p className="text-xs text-gray-500">Cobran\u00e7as em Aberto</p>
+              <p className="text-lg font-bold text-yellow-700">{fmtBRL(totalCobAberto)}</p>
+            </div>
+          </div>
+        </div>
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4">
+          <div className="flex items-center gap-3">
+            <div className="p-2 bg-green-100 rounded-lg"><CreditCard className="w-5 h-5 text-green-600" /></div>
+            <div>
+              <p className="text-xs text-gray-500">Cobran\u00e7as Pagas</p>
+              <p className="text-lg font-bold text-green-700">{fmtBRL(totalCobPago)}</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Gr\u00e1ficos */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Movimenta\u00e7\u00e3o Mensal */}
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4">
+          <h2 className="text-sm font-semibold text-gray-700 mb-3">Movimenta\u00e7\u00e3o Mensal ({unidadeSel})</h2>
+          {movMensal.length === 0 ? (
+            <p className="text-gray-400 text-center py-8">Sem dados</p>
+          ) : (
+            <ResponsiveContainer width="100%" height={250}>
+              <BarChart data={movMensal}>
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis dataKey="mes" tick={{ fontSize: 11 }} />
+                <YAxis tick={{ fontSize: 11 }} />
+                <Tooltip formatter={(v: any) => fmtDec(Number(v))} />
+                <Legend />
+                <Bar dataKey="entradas" name="Entradas" fill="#059669" radius={[4,4,0,0]} />
+                <Bar dataKey="saidas" name="Sa\u00eddas" fill="#dc2626" radius={[4,4,0,0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          )}
+        </div>
+
+        {/* Estoque por Produto - Pie */}
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4">
+          <h2 className="text-sm font-semibold text-gray-700 mb-3">Estoque por Produto ({unidadeSel})</h2>
+          {estoquePorProduto.length === 0 ? (
+            <p className="text-gray-400 text-center py-8">Sem dados</p>
+          ) : (
+            <ResponsiveContainer width="100%" height={250}>
+              <PieChart>
+                <Pie
+                  data={estoquePorProduto.map(p => ({ name: p.produto, value: conv(p.saldo) }))}
+                  cx="50%" cy="50%" outerRadius={90} dataKey="value"
+                  label={({ name, value }: any) => `${name}: ${fmtDec(value)}`}
+                >
+                  {estoquePorProduto.map((_, i) => <Cell key={i} fill={CORES_PIE[i % CORES_PIE.length]} />)}
+                </Pie>
+                <Tooltip formatter={(v: any) => fmtDec(Number(v))} />
+              </PieChart>
+            </ResponsiveContainer>
+          )}
         </div>
       </div>
 

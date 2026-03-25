@@ -24,6 +24,9 @@ import RomaneioSaida from './pages/armazem/RomaneioSaida'
 import Estoque from './pages/armazem/Estoque'
 import TabelasDesconto from './pages/armazem/TabelasDesconto'
 import TarifasServico from './pages/armazem/TarifasServico'
+import QuebraTecnica from './pages/armazem/QuebraTecnica'
+import Cobrancas from './pages/armazem/Cobrancas'
+import FechamentoMensal from './pages/armazem/FechamentoMensal'
 
 function App() {
   return (
@@ -55,6 +58,9 @@ function App() {
           <Route path="/armazem/estoque" element={<Estoque />} />
           <Route path="/armazem/tabelas-desconto" element={<TabelasDesconto />} />
           <Route path="/armazem/tarifas" element={<TarifasServico />} />
+          <Route path="/armazem/quebra-tecnica" element={<QuebraTecnica />} />
+          <Route path="/armazem/cobrancas" element={<Cobrancas />} />
+          <Route path="/armazem/fechamento" element={<FechamentoMensal />} />
 
           {/* Universal */}
           <Route path="/cadastros" element={<Cadastros />} />

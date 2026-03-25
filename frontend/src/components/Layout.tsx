@@ -5,7 +5,8 @@ import {
   ClipboardList, FileText, Menu, X, FolderOpen, ChevronDown,
   ChevronRight, Settings, Upload, Sprout, ShoppingCart,
   BarChart3, FileSignature, Wheat, Link2, Warehouse, BoxesIcon,
-  ClipboardCheck, Table2, Receipt, BarChart
+  ClipboardCheck, Table2, Receipt, BarChart, TrendingDown,
+  CreditCard, FileSpreadsheet
 } from 'lucide-react'
 
 interface NavItem {
@@ -62,6 +63,9 @@ const MODULES: ModuleGroup[] = [
       { path: '/armazem/estoque', label: 'Estoque', icon: BoxesIcon },
       { path: '/armazem/tabelas-desconto', label: 'Tabelas de Desconto', icon: Table2 },
       { path: '/armazem/tarifas', label: 'Tarifas de Serviço', icon: Receipt },
+      { path: '/armazem/quebra-tecnica', label: 'Quebra Técnica', icon: TrendingDown },
+      { path: '/armazem/cobrancas', label: 'Cobranças', icon: CreditCard },
+      { path: '/armazem/fechamento', label: 'Fechamento Mensal', icon: FileSpreadsheet },
     ],
   },
 ]
