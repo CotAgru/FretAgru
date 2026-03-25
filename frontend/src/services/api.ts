@@ -544,3 +544,194 @@ export const updateUnidadeMedida = async (id: string, data: any) =>
 
 export const deleteUnidadeMedida = async (id: string) =>
   throwIfError(await supabase.from('unidades_medida').delete().eq('id', id))
+
+// ============================================================
+// === SILAGRU — UNIDADES ARMAZENADORAS ===
+// ============================================================
+export const getUnidadesArmazenadoras = async () =>
+  throwIfError(await supabase.from('unidades_armazenadoras').select('*').eq('ativo', true).order('nome'))
+
+export const createUnidadeArmazenadora = async (data: any) =>
+  throwIfError(await supabase.from('unidades_armazenadoras').insert(data).select().single())
+
+export const updateUnidadeArmazenadora = async (id: string, data: any) =>
+  throwIfError(await supabase.from('unidades_armazenadoras').update(data).eq('id', id).select().single())
+
+export const deleteUnidadeArmazenadora = async (id: string) =>
+  throwIfError(await supabase.from('unidades_armazenadoras').delete().eq('id', id))
+
+// === ESTRUTURAS DE ARMAZENAMENTO ===
+export const getEstruturas = async (unidadeId: string) => {
+  const { data, error } = await supabase
+    .from('estruturas_armazenamento')
+    .select('*, produtos(nome)')
+    .eq('unidade_id', unidadeId)
+    .eq('ativo', true)
+    .order('nome')
+  if (error) throw error
+  return (data || []).map((e: any) => ({ ...e, produto_nome: e.produtos?.nome }))
+}
+
+export const getEstruturasByUnidade = async (unidadeId: string) => {
+  const { data, error } = await supabase
+    .from('estruturas_armazenamento')
+    .select('id, nome, tipo, capacidade_tons')
+    .eq('unidade_id', unidadeId)
+    .eq('ativo', true)
+    .order('nome')
+  if (error) throw error
+  return data || []
+}
+
+export const createEstrutura = async (data: any) =>
+  throwIfError(await supabase.from('estruturas_armazenamento').insert(data).select().single())
+
+export const updateEstrutura = async (id: string, data: any) =>
+  throwIfError(await supabase.from('estruturas_armazenamento').update(data).eq('id', id).select().single())
+
+export const deleteEstrutura = async (id: string) =>
+  throwIfError(await supabase.from('estruturas_armazenamento').delete().eq('id', id))
+
+// ============================================================
+// === SILAGRU — TABELAS DE DESCONTO ===
+// ============================================================
+export const getTabelasDesconto = async () => {
+  const { data, error } = await supabase
+    .from('tabelas_desconto')
+    .select('*, produtos(nome), ano_safra(nome)')
+    .eq('ativo', true)
+    .order('nome')
+  if (error) throw error
+  return (data || []).map((t: any) => ({
+    ...t,
+    produto_nome: t.produtos?.nome,
+    ano_safra_nome: t.ano_safra?.nome,
+  }))
+}
+
+export const getTabelasDescontoPorProduto = async (produtoId: string) => {
+  const { data, error } = await supabase
+    .from('tabelas_desconto')
+    .select('*')
+    .eq('produto_id', produtoId)
+    .eq('ativo', true)
+    .order('tipo_desconto')
+  if (error) throw error
+  return data || []
+}
+
+export const createTabelaDesconto = async (data: any) =>
+  throwIfError(await supabase.from('tabelas_desconto').insert(data).select().single())
+
+export const updateTabelaDesconto = async (id: string, data: any) =>
+  throwIfError(await supabase.from('tabelas_desconto').update(data).eq('id', id).select().single())
+
+export const deleteTabelaDesconto = async (id: string) =>
+  throwIfError(await supabase.from('tabelas_desconto').delete().eq('id', id))
+
+// === FAIXAS DE DESCONTO ===
+export const getFaixasDesconto = async (tabelaId: string) => {
+  const { data, error } = await supabase
+    .from('faixas_desconto')
+    .select('*')
+    .eq('tabela_id', tabelaId)
+    .order('grau')
+  if (error) throw error
+  return data || []
+}
+
+export const createFaixaDesconto = async (data: any) =>
+  throwIfError(await supabase.from('faixas_desconto').insert(data).select().single())
+
+export const deleteFaixaDesconto = async (id: string) =>
+  throwIfError(await supabase.from('faixas_desconto').delete().eq('id', id))
+
+export const deleteFaixasDescontoPorTabela = async (tabelaId: string) =>
+  throwIfError(await supabase.from('faixas_desconto').delete().eq('tabela_id', tabelaId))
+
+// ============================================================
+// === SILAGRU — TARIFAS DE ARMAZENAGEM ===
+// ============================================================
+export const getTarifasArmazenagem = async () => {
+  const { data, error } = await supabase
+    .from('tarifas_armazenagem')
+    .select('*, unidades_armazenadoras(nome), ano_safra(nome)')
+    .eq('ativo', true)
+    .order('nome')
+  if (error) throw error
+  return (data || []).map((t: any) => ({
+    ...t,
+    unidade_nome: t.unidades_armazenadoras?.nome,
+    ano_safra_nome: t.ano_safra?.nome,
+  }))
+}
+
+export const createTarifaArmazenagem = async (data: any) =>
+  throwIfError(await supabase.from('tarifas_armazenagem').insert(data).select().single())
+
+export const updateTarifaArmazenagem = async (id: string, data: any) =>
+  throwIfError(await supabase.from('tarifas_armazenagem').update(data).eq('id', id).select().single())
+
+export const deleteTarifaArmazenagem = async (id: string) =>
+  throwIfError(await supabase.from('tarifas_armazenagem').delete().eq('id', id))
+
+// === ITENS DE TARIFA ===
+export const getTarifaItens = async (tarifaId: string) => {
+  const { data, error } = await supabase
+    .from('tarifa_itens')
+    .select('*, produtos(nome)')
+    .eq('tarifa_id', tarifaId)
+    .eq('ativo', true)
+    .order('categoria')
+  if (error) throw error
+  return (data || []).map((i: any) => ({ ...i, produto_nome: i.produtos?.nome }))
+}
+
+export const createTarifaItem = async (data: any) =>
+  throwIfError(await supabase.from('tarifa_itens').insert(data).select().single())
+
+export const updateTarifaItem = async (id: string, data: any) =>
+  throwIfError(await supabase.from('tarifa_itens').update(data).eq('id', id).select().single())
+
+export const deleteTarifaItem = async (id: string) =>
+  throwIfError(await supabase.from('tarifa_itens').delete().eq('id', id))
+
+// ============================================================
+// === SILAGRU — ROMANEIOS DE ARMAZÉM ===
+// ============================================================
+export const getRomaneiosArmazem = async (tipo?: string) => {
+  let query = supabase
+    .from('romaneios_armazem')
+    .select(`
+      *,
+      depositante:cadastros!romaneios_armazem_depositante_id_fkey(nome, nome_fantasia),
+      produto:produtos!romaneios_armazem_produto_id_fkey(nome),
+      unidade:unidades_armazenadoras!romaneios_armazem_unidade_id_fkey(nome),
+      transportadora:cadastros!romaneios_armazem_transportadora_id_fkey(nome, nome_fantasia),
+      motorista:cadastros!romaneios_armazem_motorista_id_fkey(nome, nome_fantasia)
+    `)
+    .eq('ativo', true)
+    .order('created_at', { ascending: false })
+
+  if (tipo) query = query.eq('tipo', tipo)
+
+  const { data, error } = await query
+  if (error) throw error
+  return (data || []).map((r: any) => ({
+    ...r,
+    depositante_nome: r.depositante?.nome_fantasia || r.depositante?.nome,
+    produto_nome: r.produto?.nome,
+    unidade_nome: r.unidade?.nome,
+    transportadora_nome: r.transportadora?.nome_fantasia || r.transportadora?.nome,
+    motorista_nome: r.motorista?.nome_fantasia || r.motorista?.nome,
+  }))
+}
+
+export const createRomaneioArmazem = async (data: any) =>
+  throwIfError(await supabase.from('romaneios_armazem').insert(data).select().single())
+
+export const updateRomaneioArmazem = async (id: string, data: any) =>
+  throwIfError(await supabase.from('romaneios_armazem').update(data).eq('id', id).select().single())
+
+export const deleteRomaneioArmazem = async (id: string) =>
+  throwIfError(await supabase.from('romaneios_armazem').update({ ativo: false }).eq('id', id))

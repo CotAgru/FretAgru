@@ -17,6 +17,13 @@ import ContratosVenda from './pages/ContratosVenda'
 import CompraInsumos from './pages/CompraInsumos'
 import Safra from './pages/Safra'
 import Integracoes from './pages/Integracoes'
+import DashboardArmazem from './pages/armazem/DashboardArmazem'
+import UnidadesArmazenadoras from './pages/armazem/UnidadesArmazenadoras'
+import RomaneioEntrada from './pages/armazem/RomaneioEntrada'
+import RomaneioSaida from './pages/armazem/RomaneioSaida'
+import Estoque from './pages/armazem/Estoque'
+import TabelasDesconto from './pages/armazem/TabelasDesconto'
+import TarifasServico from './pages/armazem/TarifasServico'
 
 function App() {
   return (
@@ -39,6 +46,15 @@ function App() {
           <Route path="/contratos/dashboard" element={<DashboardContratos />} />
           <Route path="/contratos/venda" element={<ContratosVenda />} />
           <Route path="/contratos/compra" element={<CompraInsumos />} />
+
+          {/* SilAgru */}
+          <Route path="/armazem/dashboard" element={<DashboardArmazem />} />
+          <Route path="/armazem/unidades" element={<UnidadesArmazenadoras />} />
+          <Route path="/armazem/entrada" element={<RomaneioEntrada />} />
+          <Route path="/armazem/saida" element={<RomaneioSaida />} />
+          <Route path="/armazem/estoque" element={<Estoque />} />
+          <Route path="/armazem/tabelas-desconto" element={<TabelasDesconto />} />
+          <Route path="/armazem/tarifas" element={<TarifasServico />} />
 
           {/* Universal */}
           <Route path="/cadastros" element={<Cadastros />} />

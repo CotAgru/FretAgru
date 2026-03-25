@@ -4,7 +4,8 @@ import {
   Truck, Users, Package, DollarSign, LayoutDashboard, CarFront,
   ClipboardList, FileText, Menu, X, FolderOpen, ChevronDown,
   ChevronRight, Settings, Upload, Sprout, ShoppingCart,
-  BarChart3, FileSignature, Wheat, Link2
+  BarChart3, FileSignature, Wheat, Link2, Warehouse, BoxesIcon,
+  ClipboardCheck, Table2, Receipt, BarChart
 } from 'lucide-react'
 
 interface NavItem {
@@ -48,6 +49,21 @@ const MODULES: ModuleGroup[] = [
       { path: '/contratos/compra', label: 'Compra de Insumos', icon: Package },
     ],
   },
+  {
+    id: 'silagru',
+    label: 'SilAgru',
+    icon: Warehouse,
+    color: 'text-amber-300',
+    children: [
+      { path: '/armazem/dashboard', label: 'Dashboard Armazém', icon: BarChart3 },
+      { path: '/armazem/unidades', label: 'Unidades/Silos', icon: Warehouse },
+      { path: '/armazem/entrada', label: 'Romaneios Entrada', icon: ClipboardCheck },
+      { path: '/armazem/saida', label: 'Romaneios Saída', icon: Package },
+      { path: '/armazem/estoque', label: 'Estoque', icon: BoxesIcon },
+      { path: '/armazem/tabelas-desconto', label: 'Tabelas de Desconto', icon: Table2 },
+      { path: '/armazem/tarifas', label: 'Tarifas de Serviço', icon: Receipt },
+    ],
+  },
 ]
 
 const GERAL_ITEMS: NavItem[] = [
@@ -68,6 +84,7 @@ export default function Layout({ children }: { children: ReactNode }) {
   const getActiveModule = (): string | null => {
     if (location.pathname.startsWith('/frete')) return 'fretagru'
     if (location.pathname.startsWith('/contratos')) return 'contagru'
+    if (location.pathname.startsWith('/armazem')) return 'silagru'
     return null
   }
 
@@ -75,7 +92,8 @@ export default function Layout({ children }: { children: ReactNode }) {
     const initial: Record<string, boolean> = {}
     MODULES.forEach(m => { initial[m.id] = false })
     const active = location.pathname.startsWith('/frete') ? 'fretagru' :
-                   location.pathname.startsWith('/contratos') ? 'contagru' : null
+                   location.pathname.startsWith('/contratos') ? 'contagru' :
+                   location.pathname.startsWith('/armazem') ? 'silagru' : null
     if (active) initial[active] = true
     return initial
   })
