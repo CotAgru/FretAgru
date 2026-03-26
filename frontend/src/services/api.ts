@@ -485,18 +485,19 @@ export const upsertIntegracao = async (provedor: string, payload: any) => {
 export const deleteIntegracao = async (id: string) =>
   throwIfError(await supabase.from('integracoes').delete().eq('id', id))
 
-// === UPLOAD IMAGEM ROMANEIO ===
+// === UPLOAD IMAGEM/PDF ROMANEIO ===
 export const uploadRomaneioImage = async (base64DataUrl: string, romaneioId?: string): Promise<string> => {
   
-  const match = base64DataUrl.match(/^data:(image\/\w+);base64,(.+)$/)
+  const match = base64DataUrl.match(/^data:((image\/\w+)|(application\/pdf));base64,(.+)$/)
   if (!match) {
-    throw new Error('Formato de imagem inválido')
+    throw new Error('Formato de arquivo inválido. Aceito: imagens ou PDF')
   }
   
   const mimeType = match[1]
-  const ext = mimeType.split('/')[1] || 'jpeg'
+  const ext = mimeType === 'application/pdf' ? 'pdf' : (mimeType.split('/')[1] || 'jpeg')
   
-  const byteString = atob(match[2])
+  const base64Data = match[4]
+  const byteString = atob(base64Data)
   const ab = new ArrayBuffer(byteString.length)
   const ia = new Uint8Array(ab)
   for (let i = 0; i < byteString.length; i++) ia[i] = byteString.charCodeAt(i)

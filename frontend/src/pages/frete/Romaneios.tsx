@@ -466,13 +466,16 @@ export default function Romaneios() {
   }
 
   const handleImageSelect = async (file: File) => {
+    const isPdf = file.type === 'application/pdf'
     const reader = new FileReader()
     reader.onload = async (e) => {
       const base64 = (e.target?.result as string)
       setImagePreview(base64)
       setImageError(false)
-      if (GEMINI_API_KEY) { await processOCR(base64) }
-      else { toast('Defina VITE_GEMINI_API_KEY para OCR automático', { icon: 'ℹ️' }) }
+      // OCR só para imagens, não para PDF
+      if (!isPdf && GEMINI_API_KEY) { await processOCR(base64) }
+      else if (!isPdf) { toast('Defina VITE_GEMINI_API_KEY para OCR automático', { icon: 'ℹ️' }) }
+      else { toast.success('PDF anexado com sucesso') }
     }
     reader.readAsDataURL(file)
   }
@@ -1099,13 +1102,13 @@ Use 0 para campos numéricos não encontrados e "" para textos. Pesos em KG inte
                   {ocrLoading && <Loader2 className="w-4 h-4 animate-spin text-purple-600" />}
                 </div>
                 <div className="flex gap-2">
-                  <input ref={fileInputRef} type="file" accept="image/*" className="hidden"
+                  <input ref={fileInputRef} type="file" accept="image/*,application/pdf" className="hidden"
                     onChange={e => { if (e.target.files?.[0]) handleImageSelect(e.target.files[0]) }} />
                   <input ref={cameraInputRef} type="file" accept="image/*" capture="environment" className="hidden"
                     onChange={e => { if (e.target.files?.[0]) handleImageSelect(e.target.files[0]) }} />
                   <button type="button" onClick={() => fileInputRef.current?.click()} disabled={ocrLoading}
                     className="flex items-center gap-2 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:opacity-50 text-sm">
-                    <Upload className="w-4 h-4" /> Anexar Imagem
+                    <Upload className="w-4 h-4" /> Anexar Arquivo
                   </button>
                   <button type="button" onClick={() => cameraInputRef.current?.click()} disabled={ocrLoading}
                     className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50 text-sm">
@@ -1115,34 +1118,41 @@ Use 0 para campos numéricos não encontrados e "" para textos. Pesos em KG inte
                 {ocrLoading && <p className="text-sm text-purple-600 mt-2">Analisando imagem com Gemini AI...</p>}
                 {imagePreview && (
                   <div className="mt-3 relative">
-                    <div className="relative group cursor-pointer" onClick={() => {
-                      if (imagePreview.startsWith('data:')) {
-                        setLightboxImage(imagePreview)
-                      } else {
-                        window.open(imagePreview, '_blank')
-                      }
-                    }}>
-                      <img src={imagePreview} alt="Romaneio" 
-                        className="w-full max-h-64 rounded-lg border shadow-sm object-contain bg-gray-100" />
-                      <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-all flex items-center justify-center rounded-lg">
-                        <div className="flex flex-col items-center gap-2 text-white opacity-0 group-hover:opacity-100 transition-opacity">
-                          {imagePreview.startsWith('data:') ? (
-                            <><ZoomIn className="w-8 h-8" /><span className="text-sm font-semibold">Ampliar</span></>
-                          ) : (
-                            <><ExternalLink className="w-8 h-8" /><span className="text-sm font-semibold">Abrir</span></>
-                          )}
+                    {imagePreview.startsWith('data:application/pdf') || imagePreview.endsWith('.pdf') ? (
+                      <div className="relative group">
+                        <a href={imagePreview} target="_blank" rel="noopener noreferrer"
+                          className="flex items-center gap-3 p-4 bg-red-50 border-2 border-red-200 rounded-lg hover:bg-red-100 transition-colors">
+                          <FileText className="w-8 h-8 text-red-600" />
+                          <div className="flex-1">
+                            <p className="font-semibold text-gray-900">Documento PDF anexado</p>
+                            <p className="text-sm text-gray-600">Clique para visualizar em nova aba</p>
+                          </div>
+                          <ExternalLink className="w-5 h-5 text-red-600" />
+                        </a>
+                      </div>
+                    ) : (
+                      <div className="relative group cursor-pointer" onClick={() => {
+                        if (imagePreview.startsWith('data:')) {
+                          setLightboxImage(imagePreview)
+                        } else {
+                          window.open(imagePreview, '_blank')
+                        }
+                      }}>
+                        <img src={imagePreview} alt="Romaneio" className="w-full max-h-40 rounded-lg border-2 shadow object-contain bg-gray-100" />
+                        <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-all flex items-center justify-center rounded-lg">
+                          <ZoomIn className="w-8 h-8 text-white opacity-0 group-hover:opacity-100 transition-opacity" />
                         </div>
                       </div>
-                    </div>
-                    <button
-                      type="button"
+                    )}
+                    <button 
+                      type="button" 
                       onClick={() => {
                         setImagePreview(null)
                         setForm(prev => ({ ...prev, imagem_url: null }))
-                        toast.success('Imagem removida')
+                        toast.success('Arquivo removido')
                       }}
-                      className="absolute top-2 right-2 bg-red-600 hover:bg-red-700 text-white rounded-full p-2 shadow-lg transition-colors z-10"
-                      title="Excluir imagem"
+                      className="absolute -top-2 -right-2 w-8 h-8 bg-red-600 text-white rounded-full shadow-lg hover:bg-red-700 flex items-center justify-center z-10"
+                      title="Remover arquivo"
                     >
                       <X className="w-4 h-4" />
                     </button>
