@@ -1,11 +1,11 @@
 import { useEffect, useState } from 'react'
-import { fmtData, fmtDataHora } from '../utils/format'
+import { fmtData, fmtDataHora } from '../../utils/format'
 import { Plus, Pencil, Trash2, X, FolderOpen, FileText, Calendar } from 'lucide-react'
 import toast from 'react-hot-toast'
-import { getOperacoes, createOperacao, updateOperacao, deleteOperacao, getAnosSafra, getSafras, syncOperacaoSafras } from '../services/api'
-import ViewModal, { Field, Section } from '../components/ViewModal'
-import SearchableSelect from '../components/SearchableSelect'
-import MultiSearchableSelect from '../components/MultiSearchableSelect'
+import { getOperacoes, createOperacao, updateOperacao, deleteOperacao, getAnosSafra, getSafras, syncOperacaoSafras } from '../../services/api'
+import ViewModal, { Field, Section } from '../../components/ViewModal'
+import SearchableSelect from '../../components/SearchableSelect'
+import MultiSearchableSelect from '../../components/MultiSearchableSelect'
 
 const STATUS_OPS = [
   { value: 'ativa', label: 'Ativa', color: 'bg-green-100 text-green-700' },

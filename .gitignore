@@ -5,7 +5,9 @@ dist/
 data/
 .DS_Store
 Thumbs.db
+desktop.ini
 .vscode/
+.windsurf/
 *.log
 
 .vercel

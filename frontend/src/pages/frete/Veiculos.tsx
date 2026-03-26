@@ -1,13 +1,13 @@
 import { useEffect, useState } from 'react'
 import { Plus, Pencil, Trash2, X, Filter, ChevronDown, FileSpreadsheet } from 'lucide-react'
 import toast from 'react-hot-toast'
-import { getVeiculos, createVeiculo, updateVeiculo, deleteVeiculo, getCadastros, getTiposCaminhao } from '../services/api'
-import ViewModal, { Field } from '../components/ViewModal'
-import SearchableSelect from '../components/SearchableSelect'
-import { useSort } from '../hooks/useSort'
-import SortHeader from '../components/SortHeader'
-import { fmtInt } from '../utils/format'
-import { exportToExcel } from '../utils/export'
+import { getVeiculos, createVeiculo, updateVeiculo, deleteVeiculo, getCadastros, getTiposCaminhao } from '../../services/api'
+import ViewModal, { Field } from '../../components/ViewModal'
+import SearchableSelect from '../../components/SearchableSelect'
+import { useSort } from '../../hooks/useSort'
+import SortHeader from '../../components/SortHeader'
+import { fmtInt } from '../../utils/format'
+import { exportToExcel } from '../../utils/export'
 
 const emptyForm = { cadastro_id: '', placa: '', tipo_caminhao: '', eixos: 0, peso_pauta_kg: 0, marca: '', modelo: '', ano: '', observacoes: '', ativo: true }
 

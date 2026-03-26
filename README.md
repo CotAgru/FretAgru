@@ -10,14 +10,15 @@
 
 A iAgru é uma plataforma modular que reúne ferramentas de gestão agrícola em um único sistema. Cada módulo atende uma necessidade específica do produtor rural, compartilhando cadastros, produtos e safras entre si.
 
-### Módulos Ativos
+### Módulos
 
-| Módulo | Descrição | Status |
-|--------|-----------|--------|
-| **FretAgru** | Gestão de fretes agrícolas (operações, ordens, romaneios, veículos, preços) | ✅ Ativo |
-| **ContAgru** | Gestão de contratos de venda e compra de insumos agrícolas | 🚧 Em desenvolvimento |
+| Módulo | Descrição | Páginas | Status |
+|--------|-----------|---------|--------|
+| **FretAgru** | Gestão de fretes agrícolas (operações, ordens, romaneios, veículos, preços, BI) | 7 | ✅ Produção |
+| **ContAgru** | Contratos de venda futura + compra de insumos agrícolas | 3 | ✅ MVP |
+| **SilAgru** | Armazenamento de grãos (recebimento, classificação, estoque, cobranças, PDF) | 10 | ✅ Produção |
 
-### Entidades Universais (compartilhadas entre módulos)
+### Entidades Universais (compartilhadas)
 
 - **Cadastros** — Produtores, motoristas, transportadoras, fornecedores, compradores, armazéns, fazendas
 - **Produtos** — Grãos (soja, milho, sorgo, feijão) e insumos
@@ -36,7 +37,6 @@ A iAgru é uma plataforma modular que reúne ferramentas de gestão agrícola em
 | **Storage** | Supabase Storage (imagens de romaneios) |
 | **Deploy** | Vercel (frontend) |
 | **Exportação** | xlsx + jsPDF (Excel e PDF) |
-| **Mapas** | Google Maps API (@vis.gl/react-google-maps) |
 
 > O frontend conecta diretamente ao Supabase via client SDK. Não há backend intermediário.
 
@@ -46,75 +46,69 @@ A iAgru é uma plataforma modular que reúne ferramentas de gestão agrícola em
 
 ```
 iAgru/
-├── frontend/
-│   └── src/
-│       ├── components/      # Componentes reutilizáveis (Layout, Pagination, SortHeader, etc.)
-│       ├── hooks/           # Hooks (useSort)
-│       ├── lib/             # Configuração Supabase
-│       ├── pages/           # Páginas de todos os módulos
-│       ├── services/        # API (Supabase queries)
-│       └── utils/           # Utilitários (format, export, importHelpers)
-├── supabase/                # Migrations SQL (v1 a v24)
-└── docs/                    # Documentação e planos
+├── MASTER-PROMPT.md                  # Arquivo mãe — regras do assistente IA
+├── REGRAS-PADRAO.md                  # Convenções obrigatórias de código
+├── MEMORIA-CONTEXTO.md               # Memória técnica consolidada
+├── PLANO-DESENVOLVIMENTO.md          # Roadmap geral do ecossistema
+├── README-ECOSSISTEMA.md             # Visão geral do ecossistema
+│
+├── docs/
+│   ├── fretagru/README.md            # Documentação do módulo FretAgru
+│   ├── contagru/README.md            # Documentação do módulo ContAgru
+│   ├── silagru/README.md             # Documentação do módulo SilAgru
+│   ├── PLANO-AUTH.md                 # Plano de autenticação
+│   └── PLANO-REESTRUTURACAO.md       # Histórico da reestruturação
+│
+├── frontend/src/
+│   ├── components/                   # 8 componentes reutilizáveis
+│   ├── pages/
+│   │   ├── frete/                    # FretAgru (7 páginas)
+│   │   ├── contratos/                # ContAgru (3 páginas)
+│   │   ├── armazem/                  # SilAgru (10 páginas)
+│   │   └── (universais)              # DashboardGeral, Cadastros, Produtos, Safra, Admin, Integracoes
+│   ├── services/api.ts               # Queries Supabase (790+ linhas)
+│   ├── utils/                        # format.ts, export.ts, importHelpers.ts
+│   ├── hooks/useSort.ts
+│   └── lib/supabase.ts
+│
+├── supabase/                         # 29 migrations (v1 a v25)
+├── api/                              # 5 serverless functions (Vercel)
+├── scripts/                          # Scripts utilitários
+└── vercel.json
 ```
 
-> Documentação técnica consolidada: [../PROJETO-MEMORIA-CONTEXTO.md](../PROJETO-MEMORIA-CONTEXTO.md)
+---
+
+## Módulos — Resumo
+
+### FretAgru (7 páginas) — [docs/fretagru/](docs/fretagru/README.md)
+Dashboard BI completo, Operações, Ordens de Carregamento, Romaneios (7 tipos de desconto), Veículos, Preços Contratados, Importação Excel (wizard 7 etapas).
+
+### ContAgru (3 páginas) — [docs/contagru/](docs/contagru/README.md)
+Dashboard Contratos, Contratos de Venda (FOB/CIF, multi-safra), Compra de Insumos.
+
+### SilAgru (10 páginas) — [docs/silagru/](docs/silagru/README.md)
+Dashboard Armazém, Unidades/Silos, Romaneios Entrada (classificação + descontos), Romaneios Saída, Estoque, Tabelas de Desconto (importação Excel), Tarifas de Serviço (12 categorias), Quebra Técnica, Cobranças, Fechamento Mensal (PDF).
+
+### Vínculos entre Módulos
+- **FretAgru ↔ ContAgru**: `contrato_venda_id` em romaneios
+- **FretAgru → SilAgru**: `romaneio_frete_id` em romaneios de entrada
+- **SilAgru → ContAgru**: `contrato_venda_id` em romaneios de saída
 
 ---
 
-## Módulo FretAgru — Funcionalidades
+## Padrões Obrigatórios — [REGRAS-PADRAO.md](REGRAS-PADRAO.md)
 
-- **Dashboard BI Fretes** — BI completo estilo Power BI:
-  - 5 KPIs: Total Viagens, Vol. s/Desc, Vol. c/Desc, Vlr Unit Médio, Vlr Total a Pagar
-  - Seletor de unidade KG/SC/TN (padrão SC) com conversão automática
-  - 8 filtros globais interativos (Ano Safra, Safra, Produto, Origem, Destino, Transportadora, Motorista, Placa)
-  - 4 gráficos: Volume mensal, Valor frete mensal, Volume por produto, Status ordens
-  - Tabela analítica por Transportadora/Placa/Motorista com ordenação e % do total
-  - Tabela por Rota (Origem → Destino)
-  - Análise de Descontos por Origem (7 tipos abertos, % desconto com badges coloridos)
-  - Frete Excedente — Custo do Volume Não Vendável (mini-cards + tabela por rota)
-  - Todas as linhas clicáveis → filtram automaticamente
-- **Operações** — Gerenciar operações de colheita/transporte por safra
-- **Ordens de Carregamento** — Controlar ordens com origem, destino, produto, transportadores
-- **Romaneios** — Tickets de pesagem com pesos, 7 tipos de desconto (decimais), cálculo de frete, seletor KG/TN/SC
-- **Veículos** — Cadastro de caminhões (placa, tipo, eixos, peso pauta)
-- **Preços Contratados** — Tabelas de frete por rota/produto/fornecedor com cálculo de distância
-- **Importação** — Wizard de 7 etapas para importar dados históricos via planilha Excel
-
----
-
-## Módulo ContAgru — Funcionalidades (MVP funcional)
-
-- **Dashboard Contratos** — Visão geral de contratos de venda e compra
-- **Contratos de Venda** — Venda futura de commodities (comprador, corretor, volume, preço, FOB/CIF)
-- **Compra de Insumos** — Contratos de compra de fertilizantes, defensivos, sementes
-- **Vinculação FretAgru ↔ ContAgru** — Campo `contrato_venda_id` em romaneios (migration v24)
-
----
-
-## Padrões do Ecossistema
-
-### Formatação
-- **Números:** ponto para milhar, vírgula para decimal (ex: 45.000 / 12,50)
-- **Moeda:** R$ 1.234,56
+- **Números:** ponto para milhar, vírgula para decimal (45.000 / 12,50)
 - **Datas:** DD/MM/AAAA
-- **Utilitários:** `frontend/src/utils/format.ts` (fmtInt, fmtDec, fmtBRL, fmtData, fmtKg, etc.)
-
-### Componentes Reutilizáveis
-- `SortHeader` — Ordenação clicável em colunas de tabela
-- `Pagination` + `usePagination` — Paginação client-side (25/50/100)
-- `ExportButtons` — Botões de exportação PDF/Excel
-- `ViewModal` — Modal de visualização de detalhes
-
-### Responsividade
-- Todas as telas são responsivas (mobile + desktop)
-- Sidebar colapsável em mobile
-- Tabelas com scroll horizontal
-- Modais em tela cheia no mobile
+- **Tabelas:** ordenação clicável em TODAS as colunas
+- **Selects:** TODOS com busca (SearchableSelect)
+- **Exportação:** PDF e Excel em TODAS as tabelas
+- **Responsividade:** mobile + desktop obrigatório
 
 ---
 
-## Como Executar Localmente
+## Como Executar
 
 ```bash
 cd frontend
@@ -122,15 +116,23 @@ npm install
 npm run dev
 ```
 
-Variáveis de ambiente necessárias (`.env`):
+Variáveis de ambiente (`.env`):
 ```
 VITE_SUPABASE_URL=https://xxx.supabase.co
 VITE_SUPABASE_ANON_KEY=eyJhbGciOi...
-VITE_GOOGLE_MAPS_API_KEY=AIza...
 ```
 
 ---
 
-## Licença
+## Documentação
+
+| Documento | Descrição |
+|-----------|-----------|
+| [MASTER-PROMPT.md](MASTER-PROMPT.md) | Regras do assistente IA |
+| [REGRAS-PADRAO.md](REGRAS-PADRAO.md) | Convenções obrigatórias |
+| [MEMORIA-CONTEXTO.md](MEMORIA-CONTEXTO.md) | Memória técnica consolidada |
+| [PLANO-DESENVOLVIMENTO.md](PLANO-DESENVOLVIMENTO.md) | Roadmap do ecossistema |
+
+---
 
 Projeto privado — Ecossistema iAgru © 2024-2026

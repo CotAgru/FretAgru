@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react'
 import { FileSignature, ShoppingCart, Package, BarChart3, Loader2, DollarSign } from 'lucide-react'
 import { Link } from 'react-router-dom'
-import { getContratosVenda, getComprasInsumo } from '../services/api'
-import { fmtInt, fmtDec, fmtBRL } from '../utils/format'
+import { getContratosVenda, getComprasInsumo } from '../../services/api'
+import { fmtInt, fmtDec, fmtBRL } from '../../utils/format'
 
 export default function DashboardContratos() {
   const [vendas, setVendas] = useState<any[]>([])

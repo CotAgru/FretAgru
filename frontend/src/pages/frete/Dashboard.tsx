@@ -1,8 +1,8 @@
 import { useEffect, useState, useMemo, useCallback } from 'react'
 import { Truck, Scale, TrendingUp, DollarSign, FileText, Loader2, Filter, X, ArrowUp, ArrowDown, ArrowUpDown, ChevronDown, ChevronRight, MapPin, BarChart3, AlertTriangle, Droplets } from 'lucide-react'
-import { getCadastros, getVeiculos, getProdutos, getPrecos, getOrdens, getRomaneios, getOperacoes, getAnosSafra, getSafras } from '../services/api'
+import { getCadastros, getVeiculos, getProdutos, getPrecos, getOrdens, getRomaneios, getOperacoes, getAnosSafra, getSafras } from '../../services/api'
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend, AreaChart, Area } from 'recharts'
-import { fmtInt, fmtDec, fmtBRL } from '../utils/format'
+import { fmtInt, fmtDec, fmtBRL } from '../../utils/format'
 
 const COLORS = ['#16a34a', '#2563eb', '#d97706', '#dc2626', '#7c3aed', '#0891b2', '#be185d', '#65a30d', '#ea580c', '#6366f1']
 const MESES = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez']

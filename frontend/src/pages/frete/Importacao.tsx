@@ -1,9 +1,9 @@
 import { useState, useRef, useCallback, useEffect } from 'react'
 import { Upload, Download, CheckCircle2, AlertCircle, ChevronRight, ChevronLeft, FileSpreadsheet, Trash2, Eye, Loader2, Users, Package, CarFront, DollarSign, FolderOpen, ClipboardList, FileText, ArrowRight } from 'lucide-react'
 import toast from 'react-hot-toast'
-import { supabase } from '../lib/supabase'
-import { IMPORT_STEPS, downloadTemplate, parseExcelFile, mapHeaders, validateRows, parseNumber, parseDateBR } from '../utils/importHelpers'
-import type { ImportStepConfig, ValidationError } from '../utils/importHelpers'
+import { supabase } from '../../lib/supabase'
+import { IMPORT_STEPS, downloadTemplate, parseExcelFile, mapHeaders, validateRows, parseNumber, parseDateBR } from '../../utils/importHelpers'
+import type { ImportStepConfig, ValidationError } from '../../utils/importHelpers'
 
 const STEP_ICONS: Record<string, any> = {
   Users, Package, CarFront, DollarSign, FolderOpen, ClipboardList, FileText
