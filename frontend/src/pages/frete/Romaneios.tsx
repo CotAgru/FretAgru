@@ -1140,13 +1140,13 @@ Use 0 para campos numéricos não encontrados e "" para textos. Pesos em KG inte
                     {imagePreview.startsWith('data:application/pdf') || imagePreview.endsWith('.pdf') ? (
                       <div className="relative group">
                         <a href={pdfBlobUrl || imagePreview} target="_blank" rel="noopener noreferrer"
-                          className="flex items-center gap-3 p-4 bg-red-50 border-2 border-red-200 rounded-lg hover:bg-red-100 transition-colors">
-                          <FileText className="w-8 h-8 text-red-600" />
+                          className="flex items-center gap-3 p-4 bg-blue-50 border-2 border-blue-200 rounded-lg hover:bg-blue-100 transition-colors">
+                          <FileText className="w-8 h-8 text-blue-600" />
                           <div className="flex-1">
                             <p className="font-semibold text-gray-900">{fileName || 'Documento PDF anexado'}</p>
                             <p className="text-sm text-gray-600">Clique para visualizar • Será salvo ao confirmar romaneio</p>
                           </div>
-                          <ExternalLink className="w-5 h-5 text-red-600" />
+                          <ExternalLink className="w-5 h-5 text-blue-600" />
                         </a>
                       </div>
                     ) : (
