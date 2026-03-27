@@ -36,7 +36,13 @@ O **iAgru** é uma plataforma modular unificada para gestão do produtor rural b
 ### 2.2 Módulo FretAgru (Gestão de Fretes)
 - **Operações** — Agrupamento lógico de ordens/romaneios
 - **Ordens de Carregamento** — Planejamento de transporte
-- **Romaneios** — Tickets de pesagem com OCR (Gemini AI), 7 tipos de desconto, campos decimais
+- **Romaneios** — Tickets de pesagem com:
+  - OCR (Gemini AI) para digitalização automática de imagens
+  - 7 tipos de desconto (umidade, impureza, avariados, ardidos, esverdeados, partidos, quebrados)
+  - Anexar imagens ou PDFs (upload Supabase Storage bucket `romaneios-img`)
+  - Preview inteligente: card azul para PDFs com nome do arquivo, imagem para fotos
+  - Exportação individual em PDF formatado (botão verde no modal)
+  - **⚠️ BASE DE CÁLCULO DO FRETE:** SEMPRE peso líquido (sem desconto), NUNCA peso corrigido
 - **Veículos** — Cadastro de caminhões/placas
 - **Preços Contratados** — Tabela de preços por rota + cálculo de distância (Google Maps)
 - **Dashboard BI FretAgru** — BI completo estilo Power BI:

@@ -315,6 +315,7 @@ export function generateRomaneioPDF(romaneio: any, helpers: {
     doc.setFont('helvetica', 'normal')
     
     if (helpers.precoContratado) addField('Preço Contratado', helpers.precoContratado)
+    addField('Base de Cálculo', fmtKg(romaneio.peso_liquido) + ' (líquido)', true)
     if (helpers.valorFrete) addField('Valor Total do Frete', helpers.valorFrete, true)
     
     yPos += 3

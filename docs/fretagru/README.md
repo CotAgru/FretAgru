@@ -34,17 +34,27 @@ O FretAgru gerencia todo o ciclo de fretes agrícolas: desde o planejamento (ope
 
 ## Lógicas Complexas
 
-### Cálculo de Frete
+### ⚠️ Cálculo de Frete — REGRA FUNDAMENTAL
 ```
 valor_frete = peso_liquido × valor_unitario_por_kg
 ```
-> Usa peso_liquido (sem desconto), NÃO peso_corrigido.
 
-### Frete Excedente
+**IMPORTANTE:** O frete é **SEMPRE** calculado sobre o **PESO LÍQUIDO** (sem desconto), **NUNCA** sobre o peso corrigido.
+
+**Base de Cálculo exibida nas telas:**
+- Modal "Detalhes do Romaneio" → mostra `Base de Cálculo: XX.XXX kg (líquido)`
+- PDF exportado do romaneio → mostra `Base de Cálculo: XX.XXX kg (líquido)`
+- Cálculo interno da função `calcularFrete()` → usa `item.peso_liquido`
+
+**Justificativa:** O transportador é pago pelo volume transportado (peso bruto - tara = peso líquido). Os descontos de qualidade (umidade, impureza, etc.) afetam apenas o peso vendável (peso corrigido), mas não reduzem o trabalho de transporte realizado.
+
+### Frete Excedente (Custo do Volume Não Vendável)
 ```
 Volume Perdido = peso_liquido - peso_corrigido
 Frete Excedente = Volume Perdido × valor_unitario_por_kg
 ```
+
+**Conceito:** O "frete excedente" é o custo do frete pago por volume que foi transportado mas não é vendável devido aos descontos de qualidade. É um indicador de perda financeira no Dashboard.
 
 ### Conversão de Unidades
 - KG é a unidade base no banco

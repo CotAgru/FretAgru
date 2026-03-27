@@ -1450,7 +1450,7 @@ Use 0 para campos numéricos não encontrados e "" para textos. Pesos em KG inte
                   <Section title="Valor do Frete" icon={<Scale className="w-5 h-5" />}>
                     <Field label="Valor do Frete" value={frete.label} highlight />
                     <Field label="Preço Contratado" value={preco ? `${fmtBRL(preco.valor)} ${preco.unidade_preco}` : '-'} />
-                    <Field label="Base de Cálculo" value={viewingItem.peso_corrigido ? `${fmtNum(viewingItem.peso_corrigido)} kg (corrigido)` : viewingItem.peso_liquido ? `${fmtNum(viewingItem.peso_liquido)} kg (líquido)` : '-'} />
+                    <Field label="Base de Cálculo" value={viewingItem.peso_liquido ? `${fmtNum(viewingItem.peso_liquido)} kg (líquido)` : '-'} />
                   </Section>
                 )
               }
