@@ -297,24 +297,29 @@ export default function Cadastros() {
     const ownerId = savedMotoristaId || editing?.id
     if (!ownerId) { toast.error('Salve o cadastro do motorista primeiro'); return }
     if (!veiculoForm.placa) { toast.error('Placa é obrigatória'); return }
+    if (!veiculoForm.tipo_caminhao) { toast.error('Tipo de caminhão é obrigatório'); return }
     try {
       await createVeiculo({
         cadastro_id: ownerId,
         placa: veiculoForm.placa.toUpperCase(),
         tipo_caminhao: veiculoForm.tipo_caminhao,
-        eixos: veiculoForm.eixos,
-        peso_pauta_kg: veiculoForm.peso_pauta_kg,
+        eixos: veiculoForm.eixos || 0,
+        peso_pauta_kg: veiculoForm.peso_pauta_kg || 0,
         marca: veiculoForm.marca || null,
         modelo: veiculoForm.modelo || null,
         ano: veiculoForm.ano ? Number(veiculoForm.ano) : null,
         ativo: true,
       })
-      toast.success('Veiculo cadastrado e vinculado!')
+      toast.success('Veículo cadastrado e vinculado!')
       setVeiculoForm(emptyVeiculoForm)
+      setShowVeiculoForm(false)
       // Recarregar veiculos para mostrar na lista
       const v = await getVeiculos()
       setAllVeiculos(v)
-    } catch { toast.error('Erro ao cadastrar veiculo') }
+    } catch (err: any) { 
+      console.error('Erro ao cadastrar veículo:', err)
+      toast.error(`Erro ao cadastrar veículo: ${err?.message || 'Erro desconhecido'}`) 
+    }
   }
 
   const remove = async (id: string) => {

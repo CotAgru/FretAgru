@@ -480,7 +480,29 @@ farm_id (fazenda)
 
 ---
 
-## 7. Pontos de Atenção e Dívidas Técnicas
+## 7. Bugs Corrigidos (Histórico)
+
+### Bug: Veículo vinculado a motorista não persiste no banco (27/03/2026)
+
+**Sintoma:** Ao cadastrar veículo vinculado a motorista, sistema exibe toast "Cadastro atualizado" mas veículo não aparece na lista nem na tabela `veiculos`.
+
+**Causa Raiz:** 
+- Faltava validação para campo obrigatório `tipo_caminhao`
+- Tratamento de erro genérico não exibia mensagem real do erro
+- Formulário não fechava após sucesso, dando impressão de que não salvou
+
+**Correção Aplicada (`Cadastros.tsx` - função `saveVeiculo`):**
+1. Adicionada validação: `if (!veiculoForm.tipo_caminhao) { toast.error('Tipo de caminhão é obrigatório'); return }`
+2. Valores padrão explícitos: `eixos: veiculoForm.eixos || 0, peso_pauta_kg: veiculoForm.peso_pauta_kg || 0`
+3. Tratamento de erro detalhado: `catch (err: any) { console.error('Erro ao cadastrar veículo:', err); toast.error(\`Erro ao cadastrar veículo: \${err?.message || 'Erro desconhecido'}\`) }`
+4. Fechar formulário após sucesso: `setShowVeiculoForm(false)`
+5. Corrigir ortografia no toast: "Veículo" com acento
+
+**Validação:** Usuário deve selecionar tipo de caminhão antes de salvar. Mensagens de erro agora são específicas e informativas.
+
+---
+
+## 8. Pontos de Atenção e Dívidas Técnicas
 
 ### Segurança (CRÍTICO)
 
