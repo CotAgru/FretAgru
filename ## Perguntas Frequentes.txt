@@ -1,0 +1,17 @@
+## Perguntas Frequentes
+
+O SIA Armazém tem como especialidade calcular a retenção de quebra técnica, ajudando a evitar perdas na safra.
+O processo de classificação no sistema é integrado ao determinador e automatizado nos descontos, o que proporciona maior segurança na classificação.
+Sim, com o aplicativo SIA APP, você tem acesso a todas as informações de seu armazém na palma da sua mão, incluindo o estoque de depositantes, a média de classificação, os romaneios, entre outras.
+NÃO E SIM. O SIACON ARMAZÉM é híbrido
+Para pesar caminhões *não* é necessário internet, trabalhamos com balança offline, garantindo que seu armazém não pare durante a safra. Contudo, para emissão de notas ficais, comunicação com o APP SIACON na palma da mão e backup online *é necessário disponibilidade de internet*.
+SIM, o SIACON ARMAZÉM possui telas intuitivas e simples que são de fácil interpretação. Até mesmo usuários com baixo conhecimento tecnológico conseguem operar o sistema de maneira tranquila.
+A SIACON possui uma equipe completa e especializada para atender suas dúvidas referente o sistema. Você pode entrar em contato através dos nossos canais de comunicação: whatsapp, telefone fixo, e-mail e chat do site.
+Passo a passo do atendimento: Após entrar em contato, sua solicitação é repassada para o nosso atendimento que fará a coleta das informações referentes a sua dúvida, logo após esse filtro a sua dúvida será enviada para um analista que dará continuidade ao seu atendimento.
+Após assinatura do contrato é feita a passagem de bastão para o time de implantação. São seguidos alguns passos:
+1º – Preenchimento das regras de negócio. Exemplo: produtos, tabelas de classificação, regras de retenção de quebra, cobrança de serviço e etc2º – Configuração do sistema conforme o passo 13º – Validação de infraestrutura 4º – Treinamento
+Sim, aqui na SIACON nós trabalhamos com o projeto ANJO, escolhemos um analista que acompanha o cliente após o treinamento durante 15 dias para que você tenha tranquilidade e segurança na operação do sistema
+Sim, nosso propósito é oferecer soluções para seus problemas específicos, caso não precise de um determinado módulo, nosso analista nunca forçará a venda sem a real necessidade.
+SIM. Durante o ano oferecemos dois treinamentos gratuitos pré-safras que oferecem um overview geral sobre as aplicações. Além disso, também é possível contratar treinamentos exclusivos focados na realidade do seu armazém.
+Integramos com todos os fabricantes e modelos, seja conexão serial ou ethernet
+SIM, através da integração com DVR Intelbras (H.264/265)  no momento que o balanceiro gravar o peso a imagem é capturada com possibilidade de impressão no romaneio

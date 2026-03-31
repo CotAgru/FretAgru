@@ -1,7 +1,7 @@
 # PROJETO-MEMORIA-CONTEXTO.md — Ecossistema iAgru
 
 > Memória técnica consolidada do ecossistema iAgru.
-> Última atualização: 26/03/2026
+> Última atualização: 28/03/2026
 
 ---
 
@@ -193,7 +193,7 @@ Dashboard Geral (/)
 
 | Tabela | Descrição |
 |--------|-----------|
-| `unidades_armazenadoras` | Armazéns físicos (nome, endereço, capacidade) |
+| `unidades_armazenadoras` | Armazéns físicos vinculados a `cadastros` (tipo Armazem) + capacidade, sigla, tipo |
 | `estruturas_armazenamento` | Silos/tulhas dentro de cada unidade |
 | `tabelas_desconto` | Tabelas de desconto por produto × tipo × safra |
 | `faixas_desconto` | Faixas grau→desconto% dentro de cada tabela |
@@ -249,6 +249,7 @@ ADD COLUMN IF NOT EXISTS contrato_venda_id UUID REFERENCES contratos_venda(id) O
 | v23 | Storage buckets (imagens romaneios) |
 | v24 | romaneio ↔ contrato_venda (vinculação FretAgru ↔ ContAgru) |
 | **v25** | **SilAgru**: unidades_armazenadoras, estruturas_armazenamento, tabelas_desconto, faixas_desconto, tarifas_armazenagem, tarifa_itens, romaneios_armazem, quebra_tecnica, cobrancas_armazenagem |
+| **v26** | **Vínculo unidades_armazenadoras → cadastros**: Adiciona cadastro_id em unidades_armazenadoras, eliminando duplicação de dados (nome, endereço, etc.) |
 
 ---
 

@@ -549,8 +549,20 @@ export const deleteUnidadeMedida = async (id: string) =>
 // ============================================================
 // === SILAGRU — UNIDADES ARMAZENADORAS ===
 // ============================================================
-export const getUnidadesArmazenadoras = async () =>
-  throwIfError(await supabase.from('unidades_armazenadoras').select('*').eq('ativo', true).order('nome'))
+export const getUnidadesArmazenadoras = async () => {
+  const { data, error } = await supabase
+    .from('unidades_armazenadoras')
+    .select('*, cadastros(id, nome, nome_fantasia, uf, cidade, logradouro, tipos)')
+    .eq('ativo', true)
+    .order('nome')
+  if (error) throw error
+  return (data || []).map((u: any) => ({
+    ...u,
+    cadastro_nome: u.cadastros?.nome_fantasia || u.cadastros?.nome || u.nome,
+    cadastro_uf: u.cadastros?.uf || u.uf,
+    cadastro_cidade: u.cadastros?.cidade || u.cidade,
+  }))
+}
 
 export const createUnidadeArmazenadora = async (data: any) =>
   throwIfError(await supabase.from('unidades_armazenadoras').insert(data).select().single())

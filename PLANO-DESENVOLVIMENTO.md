@@ -1,5 +1,5 @@
 # Plano de Desenvolvimento - Ecossistema iAgru
-> Atualizado em: 26/03/2026
+> Atualizado em: 28/03/2026
 
 > Documento de referência técnica consolidada: [PROJETO-MEMORIA-CONTEXTO.md](./PROJETO-MEMORIA-CONTEXTO.md)
 
@@ -98,6 +98,8 @@ O **iAgru** é uma plataforma modular unificada para gestão do produtor rural b
 | v22 | RLS, unidades, tipos |
 | v23 | Storage buckets (imagens de romaneios) |
 | **v24** | **romaneio ↔ contrato_venda (vinculação FretAgru ↔ ContAgru)** |
+| **v25** | **SilAgru — 9 tabelas completas (armazenamento de grãos)** |
+| **v26** | **Vínculo unidades_armazenadoras → cadastros (eliminação de duplicação)** |
 
 ### 3.2 Tabelas Ativas
 **Universais:** `cadastros`, `produtos`, `ano_safra`, `culturas`, `tipos_safra`, `safras`
@@ -149,6 +151,7 @@ O **iAgru** é uma plataforma modular unificada para gestão do produtor rural b
   - Menu lateral com módulo SilAgru (cor âmbar)
 - [x] **SilAgru — Fase 2 completa**: Quebra Técnica (0,01%/dia), Cobranças (CRUD + geração em lote), Fechamento Mensal (extrato consolidado), Dashboard BI avançado (7 KPIs + gráficos Recharts)
 - [x] **SilAgru — Fase 3 completa**: Vínculo FretAgru (romaneio_frete_id), vínculo ContAgru (contrato_venda_id), importação Excel de faixas de desconto, extrato PDF (jsPDF + autoTable)
+- [x] **SilAgru — Integração com Cadastros Gerais**: Unidades armazenadoras agora vinculadas à tabela `cadastros` (tipo Armazem), eliminando duplicação de dados. Modal de criação rápida de armazém diretamente na tela de unidades.
 
 ### 4.2 Próximas Melhorias — Prioridade Alta
 - [ ] **Autenticação**: Login com Supabase Auth (email/senha), RLS por organização

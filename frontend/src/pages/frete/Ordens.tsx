@@ -4,6 +4,7 @@ import toast from 'react-hot-toast'
 import { getOrdens, createOrdem, updateOrdem, deleteOrdem, getCadastros, getProdutos, getVeiculos, getPrecos, getOrdemTransportadores, addOrdemTransportador, removeOrdemTransportador, getOperacoes, createCadastro, createProduto, createPreco } from '../../services/api'
 import ViewModal, { Field, Section } from '../../components/ViewModal'
 import SearchableSelect from '../../components/SearchableSelect'
+import MultiSearchableSelect from '../../components/MultiSearchableSelect'
 import { useSort } from '../../hooks/useSort'
 import SortHeader from '../../components/SortHeader'
 import { fmtData, fmtDataHora, fmtInt, fmtDec } from '../../utils/format'
@@ -65,7 +66,7 @@ export default function Ordens() {
   const [form, setForm] = useState(emptyForm)
   const [searchTerm, setSearchTerm] = useState('')
   const pagination = usePagination(25)
-  const [activeFilters, setActiveFilters] = useState<{id: string, field: string, value: string}[]>([])
+  const [activeFilters, setActiveFilters] = useState<{id: string, field: string, values: string[]}[]>([])
   const [showFilterOptions, setShowFilterOptions] = useState(false)
   const [viewingItem, setViewingItem] = useState<any>(null)
 
@@ -152,12 +153,12 @@ export default function Ordens() {
 
   const addFilter = (field: string) => {
     const id = Date.now().toString()
-    setActiveFilters([...activeFilters, { id, field, value: '' }])
+    setActiveFilters([...activeFilters, { id, field, values: [] }])
     setShowFilterOptions(false)
   }
 
-  const updateFilterValue = (id: string, value: string) => {
-    setActiveFilters(activeFilters.map(f => f.id === id ? { ...f, value } : f))
+  const updateFilterValues = (id: string, values: string[]) => {
+    setActiveFilters(activeFilters.map(f => f.id === id ? { ...f, values } : f))
   }
 
   const removeFilter = (id: string) => {
@@ -440,14 +441,14 @@ export default function Ordens() {
     }
 
     for (const filter of activeFilters) {
-      if (!filter.value) continue
+      if (!filter.values || filter.values.length === 0) continue
       switch (filter.field) {
-        case 'operacao': if (item.operacao_id !== filter.value) return false; break
-        case 'status': if (item.status !== filter.value) return false; break
-        case 'origem': if (item.origem_id !== filter.value) return false; break
-        case 'destino': if (item.destino_id !== filter.value) return false; break
-        case 'produto': if (item.produto_id !== filter.value) return false; break
-        case 'nome': if (!(item.nome_ordem || '').toLowerCase().includes(filter.value.toLowerCase())) return false; break
+        case 'operacao': if (!filter.values.includes(item.operacao_id)) return false; break
+        case 'status': if (!filter.values.includes(item.status)) return false; break
+        case 'origem': if (!filter.values.includes(item.origem_id)) return false; break
+        case 'destino': if (!filter.values.includes(item.destino_id)) return false; break
+        case 'produto': if (!filter.values.includes(item.produto_id)) return false; break
+        case 'nome': { const term = filter.values[0]?.toLowerCase() || ''; if (!(item.nome_ordem || '').toLowerCase().includes(term)) return false; break }
       }
     }
     return true
@@ -517,17 +518,17 @@ export default function Ordens() {
               if (!fieldDef) return null
               return (
                 <div key={filter.id} className="flex items-center gap-2 bg-gray-100 rounded-lg p-2 pr-3">
-                  <span className="text-xs font-medium text-gray-600">{fieldDef.label}:</span>
+                  <span className="text-xs font-medium text-gray-600 whitespace-nowrap">{fieldDef.label}:</span>
                   {fieldDef.type === 'select' ? (
-                    <select value={filter.value} onChange={e => updateFilterValue(filter.id, e.target.value)}
-                      className="text-sm border-0 bg-transparent focus:ring-0 p-0 pr-6">
-                      <option value="">Selecione...</option>
-                      {fieldDef.options && fieldDef.options().map((opt: any) => (
-                        <option key={opt.value} value={opt.value}>{opt.label}</option>
-                      ))}
-                    </select>
+                    <MultiSearchableSelect
+                      values={filter.values}
+                      onChange={(vals) => updateFilterValues(filter.id, vals)}
+                      options={fieldDef.options ? fieldDef.options() : []}
+                      placeholder="Selecione..."
+                      className="min-w-[200px]"
+                    />
                   ) : (
-                    <input type="text" value={filter.value} onChange={e => updateFilterValue(filter.id, e.target.value)}
+                    <input type="text" value={filter.values[0] || ''} onChange={e => updateFilterValues(filter.id, e.target.value ? [e.target.value] : [])}
                       placeholder="Digite..." className="text-sm border-0 bg-transparent focus:ring-0 p-0 w-32" />
                   )}
                   <button onClick={() => removeFilter(filter.id)} className="p-1 hover:bg-gray-200 rounded">

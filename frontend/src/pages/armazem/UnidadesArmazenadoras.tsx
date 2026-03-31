@@ -1,8 +1,9 @@
 import { useEffect, useState, useMemo } from 'react'
 import { Plus, Pencil, Trash2, X, Warehouse, ArrowUp, ArrowDown, ArrowUpDown } from 'lucide-react'
 import toast from 'react-hot-toast'
-import { getUnidadesArmazenadoras, createUnidadeArmazenadora, updateUnidadeArmazenadora, deleteUnidadeArmazenadora, getEstruturas, createEstrutura, updateEstrutura, deleteEstrutura, getProdutos } from '../../services/api'
+import { getUnidadesArmazenadoras, createUnidadeArmazenadora, updateUnidadeArmazenadora, deleteUnidadeArmazenadora, getEstruturas, createEstrutura, updateEstrutura, deleteEstrutura, getProdutos, getCadastros, createCadastro } from '../../services/api'
 import { fmtDec } from '../../utils/format'
+import SearchableSelect from '../../components/SearchableSelect'
 
 type SortDir = 'asc' | 'desc'
 
@@ -12,6 +13,7 @@ const TIPOS_ESTRUTURA = ['silo', 'armazem_graneleiro', 'tulha', 'big_bag']
 export default function UnidadesArmazenadoras() {
   const [unidades, setUnidades] = useState<any[]>([])
   const [produtos, setProdutos] = useState<any[]>([])
+  const [cadastros, setCadastros] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [showModal, setShowModal] = useState(false)
   const [editId, setEditId] = useState<string | null>(null)
@@ -20,16 +22,19 @@ export default function UnidadesArmazenadoras() {
   const [showEstModal, setShowEstModal] = useState(false)
   const [editEstId, setEditEstId] = useState<string | null>(null)
   const [sort, setSort] = useState<{ col: string; dir: SortDir }>({ col: 'nome', dir: 'asc' })
+  const [showNovoArmazemModal, setShowNovoArmazemModal] = useState(false)
 
-  const [form, setForm] = useState({ nome: '', sigla: '', endereco: '', uf: '', cidade: '', capacidade_total_tons: '', tipo: 'armazem' })
+  const [form, setForm] = useState({ cadastro_id: '', sigla: '', capacidade_total_tons: '', tipo: 'armazem' })
   const [estForm, setEstForm] = useState({ nome: '', tipo: 'silo', capacidade_tons: '', produto_atual_id: '', observacoes: '' })
+  const [novoArmazemForm, setNovoArmazemForm] = useState({ nome: '', uf: 'GO', cidade: '', logradouro: '' })
 
   const load = async () => {
     setLoading(true)
     try {
-      const [u, p] = await Promise.all([getUnidadesArmazenadoras(), getProdutos()])
+      const [u, p, c] = await Promise.all([getUnidadesArmazenadoras(), getProdutos(), getCadastros()])
       setUnidades(u)
       setProdutos(p)
+      setCadastros(c)
     } catch (e: any) { toast.error(e.message) }
     setLoading(false)
   }
@@ -45,18 +50,15 @@ export default function UnidadesArmazenadoras() {
 
   const openCreate = () => {
     setEditId(null)
-    setForm({ nome: '', sigla: '', endereco: '', uf: '', cidade: '', capacidade_total_tons: '', tipo: 'armazem' })
+    setForm({ cadastro_id: '', sigla: '', capacidade_total_tons: '', tipo: 'armazem' })
     setShowModal(true)
   }
 
   const openEdit = (u: any) => {
     setEditId(u.id)
     setForm({
-      nome: u.nome || '',
+      cadastro_id: u.cadastro_id || '',
       sigla: u.sigla || '',
-      endereco: u.endereco || '',
-      uf: u.uf || '',
-      cidade: u.cidade || '',
       capacidade_total_tons: u.capacidade_total_tons ? String(u.capacidade_total_tons) : '',
       tipo: u.tipo || 'armazem',
     })
@@ -64,10 +66,12 @@ export default function UnidadesArmazenadoras() {
   }
 
   const handleSave = async () => {
-    if (!form.nome.trim()) return toast.error('Nome é obrigatório')
+    if (!form.cadastro_id) return toast.error('Selecione um armazém')
     try {
       const payload = {
-        ...form,
+        cadastro_id: form.cadastro_id,
+        sigla: form.sigla || null,
+        tipo: form.tipo,
         capacidade_total_tons: form.capacidade_total_tons ? parseFloat(form.capacidade_total_tons.replace(',', '.')) : null,
       }
       if (editId) {
@@ -144,6 +148,30 @@ export default function UnidadesArmazenadoras() {
     } catch (e: any) { toast.error(e.message) }
   }
 
+  const handleSaveNovoArmazem = async () => {
+    if (!novoArmazemForm.nome.trim()) return toast.error('Nome é obrigatório')
+    if (!novoArmazemForm.uf) return toast.error('UF é obrigatória')
+    if (!novoArmazemForm.cidade) return toast.error('Cidade é obrigatória')
+    try {
+      const novoCadastro = await createCadastro({
+        nome: novoArmazemForm.nome,
+        uf: novoArmazemForm.uf,
+        cidade: novoArmazemForm.cidade,
+        logradouro: novoArmazemForm.logradouro || null,
+        tipos: ['Armazem'],
+        tipo_pessoa: 'juridica',
+        ativo: true,
+      })
+      toast.success('Armazém cadastrado com sucesso!')
+      setShowNovoArmazemModal(false)
+      setNovoArmazemForm({ nome: '', uf: 'GO', cidade: '', logradouro: '' })
+      await load()
+      setForm({ ...form, cadastro_id: novoCadastro.id })
+    } catch (e: any) { toast.error(e.message) }
+  }
+
+  const armazensDisponiveis = cadastros.filter((c: any) => (c.tipos || []).includes('Armazem'))
+
   const sorted = useMemo(() => {
     const arr = [...unidades]
     arr.sort((a: any, b: any) => {
@@ -191,10 +219,10 @@ export default function UnidadesArmazenadoras() {
               <tr><td colSpan={7} className="text-center py-8 text-gray-400">Nenhuma unidade cadastrada</td></tr>
             ) : sorted.map(u => (
               <tr key={u.id} className="border-b hover:bg-gray-50">
-                <td className="px-3 py-2 font-medium">{u.nome}</td>
+                <td className="px-3 py-2 font-medium">{u.cadastro_nome || u.nome}</td>
                 <td className="px-3 py-2">{u.sigla}</td>
-                <td className="px-3 py-2">{u.cidade}</td>
-                <td className="px-3 py-2">{u.uf}</td>
+                <td className="px-3 py-2">{u.cadastro_cidade || u.cidade}</td>
+                <td className="px-3 py-2">{u.cadastro_uf || u.uf}</td>
                 <td className="px-3 py-2 capitalize">{u.tipo}</td>
                 <td className="px-3 py-2 text-right">{u.capacidade_total_tons ? fmtDec(u.capacidade_total_tons) : '-'}</td>
                 <td className="px-3 py-2">
@@ -226,8 +254,18 @@ export default function UnidadesArmazenadoras() {
             </div>
             <div className="p-4 space-y-3">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Nome *</label>
-                <input value={form.nome} onChange={e => setForm({ ...form, nome: e.target.value })} className="w-full border rounded-lg px-3 py-2 text-sm" />
+                <div className="flex items-center justify-between mb-1">
+                  <label className="block text-sm font-medium text-gray-700">Armazém *</label>
+                  <button onClick={() => setShowNovoArmazemModal(true)} className="text-xs text-amber-600 hover:text-amber-700 font-medium flex items-center gap-1">
+                    <Plus className="w-3 h-3" /> Novo Armazém
+                  </button>
+                </div>
+                <SearchableSelect
+                  options={armazensDisponiveis.map(c => ({ value: c.id, label: c.nome_fantasia || c.nome }))}
+                  value={form.cadastro_id}
+                  onChange={(val) => setForm({ ...form, cadastro_id: val })}
+                  placeholder="Selecione um armazém..."
+                />
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
@@ -242,22 +280,8 @@ export default function UnidadesArmazenadoras() {
                 </div>
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Endereço</label>
-                <input value={form.endereco} onChange={e => setForm({ ...form, endereco: e.target.value })} className="w-full border rounded-lg px-3 py-2 text-sm" />
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Cidade</label>
-                  <input value={form.cidade} onChange={e => setForm({ ...form, cidade: e.target.value })} className="w-full border rounded-lg px-3 py-2 text-sm" />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">UF</label>
-                  <input value={form.uf} onChange={e => setForm({ ...form, uf: e.target.value.toUpperCase() })} maxLength={2} className="w-full border rounded-lg px-3 py-2 text-sm" />
-                </div>
-              </div>
-              <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Capacidade Total (Toneladas)</label>
-                <input value={form.capacidade_total_tons} onChange={e => setForm({ ...form, capacidade_total_tons: e.target.value })} className="w-full border rounded-lg px-3 py-2 text-sm" placeholder="Ex: 5000" />
+                <input value={form.capacidade_total_tons} onChange={e => setForm({ ...form, capacidade_total_tons: e.target.value })} className="w-full border rounded-lg px-3 py-2 text-sm" placeholder="Ex: 5.000" />
               </div>
             </div>
             <div className="flex justify-end gap-2 p-4 border-t">
@@ -273,7 +297,7 @@ export default function UnidadesArmazenadoras() {
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-xl shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between p-4 border-b">
-              <h2 className="text-lg font-semibold">Estruturas — {unidades.find(u => u.id === showEstruturas)?.nome}</h2>
+              <h2 className="text-lg font-semibold">Estruturas — {unidades.find(u => u.id === showEstruturas)?.cadastro_nome || unidades.find(u => u.id === showEstruturas)?.nome}</h2>
               <div className="flex items-center gap-2">
                 <button onClick={openCreateEst} className="flex items-center gap-1 bg-amber-600 text-white px-3 py-1.5 rounded-lg text-sm hover:bg-amber-700">
                   <Plus className="w-4 h-4" /> Nova
@@ -309,6 +333,42 @@ export default function UnidadesArmazenadoras() {
                   ))}
                 </tbody>
               </table>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Novo Armazém */}
+      {showNovoArmazemModal && (
+        <div className="fixed inset-0 bg-black/50 z-[60] flex items-center justify-center p-4">
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-md">
+            <div className="flex items-center justify-between p-4 border-b">
+              <h2 className="text-lg font-semibold">Novo Armazém</h2>
+              <button onClick={() => setShowNovoArmazemModal(false)} className="p-1 hover:bg-gray-100 rounded"><X className="w-5 h-5" /></button>
+            </div>
+            <div className="p-4 space-y-3">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Nome *</label>
+                <input value={novoArmazemForm.nome} onChange={e => setNovoArmazemForm({ ...novoArmazemForm, nome: e.target.value })} className="w-full border rounded-lg px-3 py-2 text-sm" placeholder="Ex: Armazém Central" />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">UF *</label>
+                  <input value={novoArmazemForm.uf} onChange={e => setNovoArmazemForm({ ...novoArmazemForm, uf: e.target.value.toUpperCase() })} maxLength={2} className="w-full border rounded-lg px-3 py-2 text-sm" />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Cidade *</label>
+                  <input value={novoArmazemForm.cidade} onChange={e => setNovoArmazemForm({ ...novoArmazemForm, cidade: e.target.value })} className="w-full border rounded-lg px-3 py-2 text-sm" />
+                </div>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Endereço</label>
+                <input value={novoArmazemForm.logradouro} onChange={e => setNovoArmazemForm({ ...novoArmazemForm, logradouro: e.target.value })} className="w-full border rounded-lg px-3 py-2 text-sm" placeholder="Ex: Rua Principal, 123" />
+              </div>
+            </div>
+            <div className="flex justify-end gap-2 p-4 border-t">
+              <button onClick={() => setShowNovoArmazemModal(false)} className="px-4 py-2 text-sm border rounded-lg hover:bg-gray-50">Cancelar</button>
+              <button onClick={handleSaveNovoArmazem} className="px-4 py-2 text-sm bg-amber-600 text-white rounded-lg hover:bg-amber-700">Cadastrar</button>
             </div>
           </div>
         </div>

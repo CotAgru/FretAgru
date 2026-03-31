@@ -4,6 +4,7 @@ import toast from 'react-hot-toast'
 import { getPrecos, createPreco, updatePreco, deletePreco, getCadastros, getProdutos } from '../../services/api'
 import ViewModal, { Field } from '../../components/ViewModal'
 import SearchableSelect from '../../components/SearchableSelect'
+import MultiSearchableSelect from '../../components/MultiSearchableSelect'
 import { useSort } from '../../hooks/useSort'
 import SortHeader from '../../components/SortHeader'
 import { fmtBRL, fmtInt, fmtData } from '../../utils/format'
@@ -28,7 +29,7 @@ export default function Precos() {
   const [form, setForm] = useState(emptyForm)
   const [searchTerm, setSearchTerm] = useState('')
   const pagination = usePagination(25)
-  const [activeFilters, setActiveFilters] = useState<{id: string, field: string, value: string}[]>([])
+  const [activeFilters, setActiveFilters] = useState<{id: string, field: string, values: string[]}[]>([])
   const [showFilterOptions, setShowFilterOptions] = useState(false)
   const [calcDist, setCalcDist] = useState(false)
   const [viewingItem, setViewingItem] = useState<any>(null)
@@ -161,12 +162,12 @@ export default function Precos() {
   ]
 
   const addFilter = (field: string) => {
-    setActiveFilters([...activeFilters, { id: Date.now().toString(), field, value: '' }])
+    setActiveFilters([...activeFilters, { id: Date.now().toString(), field, values: [] }])
     setShowFilterOptions(false)
   }
 
-  const updateFilterValue = (id: string, value: string) => {
-    setActiveFilters(activeFilters.map(f => f.id === id ? { ...f, value } : f))
+  const updateFilterValues = (id: string, values: string[]) => {
+    setActiveFilters(activeFilters.map(f => f.id === id ? { ...f, values } : f))
   }
 
   const removeFilter = (id: string) => {
@@ -281,13 +282,13 @@ export default function Precos() {
       if (!matchesSearch) return false
     }
     for (const filter of activeFilters) {
-      if (!filter.value) continue
+      if (!filter.values || filter.values.length === 0) continue
       switch (filter.field) {
-        case 'origem': if (item.origem_id !== filter.value) return false; break
-        case 'destino': if (item.destino_id !== filter.value) return false; break
-        case 'produto': if (item.produto_id !== filter.value) return false; break
-        case 'fornecedor': if (item.fornecedor_id !== filter.value) return false; break
-        case 'unidade': if (item.unidade_preco !== filter.value) return false; break
+        case 'origem': if (!filter.values.includes(item.origem_id)) return false; break
+        case 'destino': if (!filter.values.includes(item.destino_id)) return false; break
+        case 'produto': if (!filter.values.includes(item.produto_id)) return false; break
+        case 'fornecedor': if (!filter.values.includes(item.fornecedor_id)) return false; break
+        case 'unidade': if (!filter.values.includes(item.unidade_preco)) return false; break
       }
     }
     return true
@@ -351,14 +352,14 @@ export default function Precos() {
               if (!fieldDef) return null
               return (
                 <div key={filter.id} className="flex items-center gap-2 bg-gray-100 rounded-lg p-2 pr-3">
-                  <span className="text-xs font-medium text-gray-600">{fieldDef.label}:</span>
-                  <select value={filter.value} onChange={e => updateFilterValue(filter.id, e.target.value)}
-                    className="text-sm border-0 bg-transparent focus:ring-0 p-0 pr-6">
-                    <option value="">Selecione...</option>
-                    {fieldDef.options && fieldDef.options().map((opt: any) => (
-                      <option key={opt.value} value={opt.value}>{opt.label}</option>
-                    ))}
-                  </select>
+                  <span className="text-xs font-medium text-gray-600 whitespace-nowrap">{fieldDef.label}:</span>
+                  <MultiSearchableSelect
+                    values={filter.values}
+                    onChange={(vals) => updateFilterValues(filter.id, vals)}
+                    options={fieldDef.options ? fieldDef.options() : []}
+                    placeholder="Selecione..."
+                    className="min-w-[200px]"
+                  />
                   <button onClick={() => removeFilter(filter.id)} className="p-1 hover:bg-gray-200 rounded">
                     <X className="w-3 h-3 text-gray-500" />
                   </button>

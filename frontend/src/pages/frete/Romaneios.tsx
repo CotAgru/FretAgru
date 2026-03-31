@@ -130,7 +130,7 @@ export default function Romaneios() {
   const [showColumnConfig, setShowColumnConfig] = useState(false)
   const [searchTerm, setSearchTerm] = useState('')
   const pagination = usePagination(25)
-  const [activeFilters, setActiveFilters] = useState<{id: string, field: string, value: string}[]>([])
+  const [activeFilters, setActiveFilters] = useState<{id: string, field: string, values: string[]}[]>([])
   const [showFilterOptions, setShowFilterOptions] = useState(false)
   const [viewingItem, setViewingItem] = useState<any>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -313,12 +313,12 @@ export default function Romaneios() {
 
   const addFilter = (field: string) => {
     const id = Date.now().toString()
-    setActiveFilters([...activeFilters, { id, field, value: '' }])
+    setActiveFilters([...activeFilters, { id, field, values: [] }])
     setShowFilterOptions(false)
   }
 
-  const updateFilterValue = (id: string, value: string) => {
-    setActiveFilters(activeFilters.map(f => f.id === id ? { ...f, value } : f))
+  const updateFilterValues = (id: string, values: string[]) => {
+    setActiveFilters(activeFilters.map(f => f.id === id ? { ...f, values } : f))
   }
 
   const removeFilter = (id: string) => {
@@ -795,56 +795,60 @@ Use 0 para campos numéricos não encontrados e "" para textos. Pesos em KG inte
 
     // Filtros avançados (todos devem passar)
     for (const filter of activeFilters) {
-      if (!filter.value) continue
+      if (!filter.values || filter.values.length === 0) continue
       
       switch (filter.field) {
         case 'operacao':
-          if (item.operacao_id !== filter.value) return false
+          if (!filter.values.includes(item.operacao_id)) return false
           break
         case 'ordem':
-          if (item.ordem_id !== filter.value) return false
+          if (!filter.values.includes(item.ordem_id)) return false
           break
         case 'produtor':
-          if (item.produtor_id !== filter.value) return false
+          if (!filter.values.includes(item.produtor_id)) return false
           break
         case 'produto':
-          if (item.produto_id !== filter.value) return false
+          if (!filter.values.includes(item.produto_id)) return false
           break
         case 'origem':
-          if (item.origem_id !== filter.value) return false
+          if (!filter.values.includes(item.origem_id)) return false
           break
         case 'destino':
-          if (item.destinatario_id !== filter.value) return false
+          if (!filter.values.includes(item.destinatario_id)) return false
           break
         case 'veiculo':
-          if (item.veiculo_id !== filter.value) return false
+          if (!filter.values.includes(item.veiculo_id)) return false
           break
         case 'motorista':
-          if (item.motorista_id !== filter.value) return false
+          if (!filter.values.includes(item.motorista_id)) return false
           break
         case 'transportadora':
-          if (item.transportadora_id !== filter.value) return false
+          if (!filter.values.includes(item.transportadora_id)) return false
           break
-        case 'ticket':
-          if (!(item.numero_ticket || '').toLowerCase().includes(filter.value.toLowerCase())) return false
+        case 'ticket': {
+          const term = filter.values[0]?.toLowerCase() || ''
+          if (!(item.numero_ticket || '').toLowerCase().includes(term)) return false
           break
-        case 'nfe':
-          if (!(item.nfe_numero || '').toLowerCase().includes(filter.value.toLowerCase())) return false
+        }
+        case 'nfe': {
+          const term = filter.values[0]?.toLowerCase() || ''
+          if (!(item.nfe_numero || '').toLowerCase().includes(term)) return false
           break
+        }
         case 'ano_safra':
-          if (item.ano_safra_id !== filter.value) return false
+          if (!filter.values.includes(item.ano_safra_id)) return false
           break
         case 'tipo_ticket':
-          if (item.tipo_ticket_id !== filter.value) return false
+          if (!filter.values.includes(item.tipo_ticket_id)) return false
           break
         case 'tipo_nf':
-          if (item.tipo_nf_id !== filter.value) return false
+          if (!filter.values.includes(item.tipo_nf_id)) return false
           break
         case 'data_saida':
-          if (item.data_saida_origem !== filter.value) return false
+          if (!filter.values.includes(item.data_saida_origem)) return false
           break
         case 'transgenia':
-          if (item.transgenia !== filter.value) return false
+          if (!filter.values.includes(item.transgenia)) return false
           break
       }
     }
@@ -962,20 +966,20 @@ Use 0 para campos numéricos não encontrados e "" para textos. Pesos em KG inte
               
               return (
                 <div key={filter.id} className="flex items-center gap-2 bg-gray-100 rounded-lg p-2 pr-3">
-                  <span className="text-xs font-medium text-gray-600">{fieldDef.label}:</span>
+                  <span className="text-xs font-medium text-gray-600 whitespace-nowrap">{fieldDef.label}:</span>
                   {fieldDef.type === 'select' ? (
-                    <select value={filter.value} onChange={e => updateFilterValue(filter.id, e.target.value)}
-                      className="text-sm border-0 bg-transparent focus:ring-0 p-0 pr-6">
-                      <option value="">Selecione...</option>
-                      {fieldDef.options && fieldDef.options().map((opt: any) => (
-                        <option key={opt.value} value={opt.value}>{opt.label}</option>
-                      ))}
-                    </select>
+                    <MultiSearchableSelect
+                      values={filter.values}
+                      onChange={(vals) => updateFilterValues(filter.id, vals)}
+                      options={fieldDef.options ? fieldDef.options() : []}
+                      placeholder="Selecione..."
+                      className="min-w-[200px]"
+                    />
                   ) : fieldDef.type === 'date' ? (
-                    <input type="date" value={filter.value} onChange={e => updateFilterValue(filter.id, e.target.value)}
+                    <input type="date" value={filter.values[0] || ''} onChange={e => updateFilterValues(filter.id, e.target.value ? [e.target.value] : [])}
                       className="text-sm border-0 bg-transparent focus:ring-0 p-0" />
                   ) : (
-                    <input type="text" value={filter.value} onChange={e => updateFilterValue(filter.id, e.target.value)}
+                    <input type="text" value={filter.values[0] || ''} onChange={e => updateFilterValues(filter.id, e.target.value ? [e.target.value] : [])}
                       placeholder="Digite..." className="text-sm border-0 bg-transparent focus:ring-0 p-0 w-32" />
                   )}
                   <button onClick={() => removeFilter(filter.id)} className="p-1 hover:bg-gray-200 rounded">

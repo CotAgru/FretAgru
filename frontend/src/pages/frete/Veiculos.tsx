@@ -4,6 +4,7 @@ import toast from 'react-hot-toast'
 import { getVeiculos, createVeiculo, updateVeiculo, deleteVeiculo, getCadastros, getTiposCaminhao } from '../../services/api'
 import ViewModal, { Field } from '../../components/ViewModal'
 import SearchableSelect from '../../components/SearchableSelect'
+import MultiSearchableSelect from '../../components/MultiSearchableSelect'
 import { useSort } from '../../hooks/useSort'
 import SortHeader from '../../components/SortHeader'
 import { fmtInt } from '../../utils/format'
@@ -20,7 +21,7 @@ export default function Veiculos() {
   const [editing, setEditing] = useState<any>(null)
   const [form, setForm] = useState(emptyForm)
   const [searchTerm, setSearchTerm] = useState('')
-  const [activeFilters, setActiveFilters] = useState<{id: string, field: string, value: string}[]>([])
+  const [activeFilters, setActiveFilters] = useState<{id: string, field: string, values: string[]}[]>([])
   const [showFilterOptions, setShowFilterOptions] = useState(false)
   const [viewingItem, setViewingItem] = useState<any>(null)
 
@@ -83,12 +84,12 @@ export default function Veiculos() {
   ]
 
   const addFilter = (field: string) => {
-    setActiveFilters([...activeFilters, { id: Date.now().toString(), field, value: '' }])
+    setActiveFilters([...activeFilters, { id: Date.now().toString(), field, values: [] }])
     setShowFilterOptions(false)
   }
 
-  const updateFilterValue = (id: string, value: string) => {
-    setActiveFilters(activeFilters.map(f => f.id === id ? { ...f, value } : f))
+  const updateFilterValues = (id: string, values: string[]) => {
+    setActiveFilters(activeFilters.map(f => f.id === id ? { ...f, values } : f))
   }
 
   const removeFilter = (id: string) => {
@@ -114,12 +115,12 @@ export default function Veiculos() {
       if (!matchesSearch) return false
     }
     for (const filter of activeFilters) {
-      if (!filter.value) continue
+      if (!filter.values || filter.values.length === 0) continue
       switch (filter.field) {
-        case 'tipo': if (item.tipo_caminhao !== filter.value) return false; break
-        case 'proprietario': if (item.cadastro_id !== filter.value) return false; break
-        case 'placa': if (!(item.placa || '').toLowerCase().includes(filter.value.toLowerCase())) return false; break
-        case 'marca': if (!(item.marca || '').toLowerCase().includes(filter.value.toLowerCase())) return false; break
+        case 'tipo': if (!filter.values.includes(item.tipo_caminhao)) return false; break
+        case 'proprietario': if (!filter.values.includes(item.cadastro_id)) return false; break
+        case 'placa': { const term = filter.values[0]?.toLowerCase() || ''; if (!(item.placa || '').toLowerCase().includes(term)) return false; break }
+        case 'marca': { const term = filter.values[0]?.toLowerCase() || ''; if (!(item.marca || '').toLowerCase().includes(term)) return false; break }
       }
     }
     return true
@@ -179,17 +180,17 @@ export default function Veiculos() {
               if (!fieldDef) return null
               return (
                 <div key={filter.id} className="flex items-center gap-2 bg-gray-100 rounded-lg p-2 pr-3">
-                  <span className="text-xs font-medium text-gray-600">{fieldDef.label}:</span>
+                  <span className="text-xs font-medium text-gray-600 whitespace-nowrap">{fieldDef.label}:</span>
                   {fieldDef.type === 'select' ? (
-                    <select value={filter.value} onChange={e => updateFilterValue(filter.id, e.target.value)}
-                      className="text-sm border-0 bg-transparent focus:ring-0 p-0 pr-6">
-                      <option value="">Selecione...</option>
-                      {fieldDef.options && fieldDef.options().map((opt: any) => (
-                        <option key={opt.value} value={opt.value}>{opt.label}</option>
-                      ))}
-                    </select>
+                    <MultiSearchableSelect
+                      values={filter.values}
+                      onChange={(vals) => updateFilterValues(filter.id, vals)}
+                      options={fieldDef.options ? fieldDef.options() : []}
+                      placeholder="Selecione..."
+                      className="min-w-[200px]"
+                    />
                   ) : (
-                    <input type="text" value={filter.value} onChange={e => updateFilterValue(filter.id, e.target.value)}
+                    <input type="text" value={filter.values[0] || ''} onChange={e => updateFilterValues(filter.id, e.target.value ? [e.target.value] : [])}
                       placeholder="Digite..." className="text-sm border-0 bg-transparent focus:ring-0 p-0 w-32" />
                   )}
                   <button onClick={() => removeFilter(filter.id)} className="p-1 hover:bg-gray-200 rounded">
