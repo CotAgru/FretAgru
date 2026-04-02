@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback, useRef } from 'react'
 import { Plus, Pencil, Trash2, X, Search, Loader2, MapPin, CarFront, ChevronDown, FileSpreadsheet, Merge } from 'lucide-react'
 import toast from 'react-hot-toast'
-import { getCadastros, createCadastro, updateCadastro, deleteCadastro, createVeiculo, getVeiculos, getTiposCaminhao } from '../services/api'
+import { getCadastros, createCadastro, updateCadastro, deleteCadastro, createVeiculo, getVeiculos, getTiposCaminhao, getUnidadesArmazenadoras, createUnidadeArmazenadora, updateUnidadeArmazenadora } from '../services/api'
 import { APIProvider, Map, AdvancedMarker, useMap } from '@vis.gl/react-google-maps'
 import ViewModal, { Field } from '../components/ViewModal'
 import SearchableSelect from '../components/SearchableSelect'
@@ -54,6 +54,10 @@ const emptyForm = {
   tipos: [] as string[],
   latitude: null as number | null, longitude: null as number | null,
   observacoes: '', transportador_id: '', ativo: true,
+  // Campos específicos de Armazém
+  armazem_sigla: '',
+  armazem_tipo: 'armazem' as 'armazem' | 'silo' | 'tulha',
+  armazem_capacidade_tons: '',
 }
 
 const emptyVeiculoForm = { placa: '', tipo_caminhao: 'Carreta', eixos: 6, peso_pauta_kg: 37000, marca: '', modelo: '', ano: '' }
@@ -134,11 +138,20 @@ export default function Cadastros() {
   const [showMergeModal, setShowMergeModal] = useState(false)
   const [mergeKeepId, setMergeKeepId] = useState<string | null>(null)
   const [mergingCadastros, setMergingCadastros] = useState(false)
+  
+  // Unidades Armazenadoras
+  const [unidadesArmazenadoras, setUnidadesArmazenadoras] = useState<any[]>([])
+  const [unidadeArmazem, setUnidadeArmazem] = useState<any>(null)
 
   const load = () => {
     setLoading(true)
-    Promise.all([getCadastros(), getVeiculos(), getTiposCaminhao()])
-      .then(([c, v, tc]) => { setItems(c); setAllVeiculos(v); setTiposCaminhao(tc.filter((t: any) => t.ativo)) })
+    Promise.all([getCadastros(), getVeiculos(), getTiposCaminhao(), getUnidadesArmazenadoras()])
+      .then(([c, v, tc, ua]) => { 
+        setItems(c); 
+        setAllVeiculos(v); 
+        setTiposCaminhao(tc.filter((t: any) => t.ativo))
+        setUnidadesArmazenadoras(ua)
+      })
       .catch(() => toast.error('Erro ao carregar'))
       .finally(() => setLoading(false))
   }
@@ -217,6 +230,7 @@ export default function Cadastros() {
   const mostraLocalizacao = form.tipos.some(t => TIPOS_COM_LOCALIZACAO.includes(t))
   const mostraMotorista = form.tipos.includes('Motorista')
   const mostraTransportadora = form.tipos.includes('Transportadora')
+  const mostraArmazem = form.tipos.includes('Armazem')
 
   // Listas filtradas para vinculos
   const transportadorasList = items.filter(i => (i.tipos || []).includes('Transportadora'))
@@ -238,9 +252,13 @@ export default function Cadastros() {
   const placasPorCadastro = (cadastroId: string) =>
     allVeiculos.filter((v: any) => v.cadastro_id === cadastroId).map((v: any) => v.placa)
 
-  const openNew = () => { setEditing(null); setForm(emptyForm); setSavedMotoristaId(null); setShowForm(true) }
+  const openNew = () => { setEditing(null); setForm(emptyForm); setSavedMotoristaId(null); setUnidadeArmazem(null); setShowForm(true) }
   const openEdit = (item: Cadastro) => {
     setEditing(item)
+    // Buscar dados de unidade armazenadora se for tipo Armazem
+    const unidade = unidadesArmazenadoras.find(u => u.cadastro_id === item.id)
+    setUnidadeArmazem(unidade || null)
+    
     setForm({
       cpf_cnpj: item.cpf_cnpj || '', nome: item.nome, nome_fantasia: item.nome_fantasia || '',
       apelido: item.apelido || '', tipo_pessoa: item.tipo_pessoa || 'juridica',
@@ -252,6 +270,10 @@ export default function Cadastros() {
       tipos: item.tipos || [],
       latitude: item.latitude, longitude: item.longitude,
       observacoes: item.observacoes || '', transportador_id: item.transportador_id || '', ativo: item.ativo,
+      // Dados de armazém
+      armazem_sigla: unidade?.sigla || '',
+      armazem_tipo: unidade?.tipo || 'armazem',
+      armazem_capacidade_tons: unidade?.capacidade_total_tons ? String(unidade.capacidade_total_tons) : '',
     })
     setSavedMotoristaId(null)
     setShowForm(true)
@@ -277,7 +299,27 @@ export default function Cadastros() {
       let result: any
       if (editing) { result = await updateCadastro(editing.id, payload); toast.success('Cadastro atualizado') }
       else { result = await createCadastro(payload); toast.success('Cadastro criado') }
-      setSavedMotoristaId(result?.id || editing?.id || null)
+      
+      const cadastroId = result?.id || editing?.id
+      setSavedMotoristaId(cadastroId || null)
+      
+      // Salvar/atualizar unidade armazenadora se tipo Armazem selecionado
+      if (mostraArmazem && cadastroId) {
+        const armazemPayload = {
+          cadastro_id: cadastroId,
+          sigla: form.armazem_sigla || null,
+          tipo: form.armazem_tipo,
+          capacidade_total_tons: form.armazem_capacidade_tons ? Number(form.armazem_capacidade_tons) : null,
+          ativo: true
+        }
+        
+        if (unidadeArmazem) {
+          await updateUnidadeArmazenadora(unidadeArmazem.id, armazemPayload)
+        } else {
+          await createUnidadeArmazenadora(armazemPayload)
+        }
+      }
+      
       if (mostraMotorista && !editing) {
         // Manter form aberto para permitir cadastrar veiculo
         setEditing(result)
@@ -285,7 +327,10 @@ export default function Cadastros() {
         setShowForm(false)
       }
       load()
-    } catch { toast.error('Erro ao salvar') }
+    } catch (err: any) { 
+      console.error('Erro ao salvar:', err)
+      toast.error('Erro ao salvar: ' + (err?.message || ''))
+    }
   }
 
   const onVeiculoTipoChange = (tipo: string) => {
@@ -777,6 +822,45 @@ export default function Cadastros() {
                   })}
                 </div>
               </div>
+
+              {/* Campos específicos de Armazém (condicional) */}
+              {mostraArmazem && (
+                <div className="border border-blue-200 bg-blue-50 rounded-lg p-4 space-y-3">
+                  <div className="flex items-center gap-2 mb-2">
+                    <div className="w-2 h-2 bg-blue-600 rounded-full" />
+                    <span className="text-sm font-semibold text-blue-800">Dados Específicos do Armazém</span>
+                  </div>
+                  
+                  <div className="grid grid-cols-3 gap-3">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Sigla</label>
+                      <input type="text" value={form.armazem_sigla} onChange={e => setForm({...form, armazem_sigla: e.target.value})}
+                        placeholder="Ex: ARM01"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Tipo</label>
+                      <select value={form.armazem_tipo} onChange={e => setForm({...form, armazem_tipo: e.target.value as 'armazem' | 'silo' | 'tulha'})}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                        <option value="armazem">Armazém</option>
+                        <option value="silo">Silo</option>
+                        <option value="tulha">Tulha</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Capacidade (Ton)</label>
+                      <input type="number" step="0.01" value={form.armazem_capacidade_tons} 
+                        onChange={e => setForm({...form, armazem_capacidade_tons: e.target.value})}
+                        placeholder="Ex: 5.000"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
+                    </div>
+                  </div>
+                  
+                  <p className="text-xs text-blue-600 mt-2">
+                    ℹ️ Estes dados serão usados no módulo SilAgru para gestão de armazenagem.
+                  </p>
+                </div>
+              )}
 
               {/* Localizacao com Google Maps (condicional) */}
               {mostraLocalizacao && (
