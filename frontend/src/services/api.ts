@@ -616,6 +616,28 @@ export const deleteTipoArmazem = async (id: string) =>
   throwIfError(await supabase.from('tipos_armazem').delete().eq('id', id))
 
 // ============================================================
+// === TIPOS DE CONTRATO ===
+// ============================================================
+
+export const getTiposContrato = async () => {
+  const { data, error } = await supabase
+    .from('tipos_contrato')
+    .select('*')
+    .order('nome')
+  if (error) throw error
+  return data || []
+}
+
+export const createTipoContrato = async (data: any) =>
+  throwIfError(await supabase.from('tipos_contrato').insert(data).select().single())
+
+export const updateTipoContrato = async (id: string, data: any) =>
+  throwIfError(await supabase.from('tipos_contrato').update(data).eq('id', id).select().single())
+
+export const deleteTipoContrato = async (id: string) =>
+  throwIfError(await supabase.from('tipos_contrato').delete().eq('id', id))
+
+// ============================================================
 // === SILAGRU — TABELAS DE DESCONTO ===
 // ============================================================
 export const getTabelasDesconto = async () => {
