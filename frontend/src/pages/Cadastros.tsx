@@ -311,16 +311,20 @@ export default function Cadastros() {
     if (!form.uf) { toast.error('UF é obrigatória'); return }
     if (!form.cidade) { toast.error('Cidade é obrigatória'); return }
     if (form.tipos.length === 0) { toast.error('Selecione pelo menos um Tipo'); return }
+    
+    // Criar payload SEM os campos de armazém (que vão para unidades_armazenadoras)
+    const { armazem_sigla, armazem_tipo, armazem_capacidade_tons, ...dadosCadastro } = form
+    
     const payload = {
-      ...form,
-      cpf_cnpj: form.cpf_cnpj || null,
-      nome_fantasia: form.nome_fantasia || null,
-      telefone1: form.telefone1 || null,
-      telefone2: form.telefone2 || null,
-      observacoes: form.observacoes || null,
-      latitude: form.latitude || null,
-      longitude: form.longitude || null,
-      transportador_id: form.transportador_id || null,
+      ...dadosCadastro,
+      cpf_cnpj: dadosCadastro.cpf_cnpj || null,
+      nome_fantasia: dadosCadastro.nome_fantasia || null,
+      telefone1: dadosCadastro.telefone1 || null,
+      telefone2: dadosCadastro.telefone2 || null,
+      observacoes: dadosCadastro.observacoes || null,
+      latitude: dadosCadastro.latitude || null,
+      longitude: dadosCadastro.longitude || null,
+      transportador_id: dadosCadastro.transportador_id || null,
     }
     try {
       let result: any
